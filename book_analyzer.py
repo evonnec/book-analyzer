@@ -25,13 +25,15 @@ class Book:
         self._sell_orders = {}
 
     def get_expense(self) -> Optional[int]:
-        # the total expense you would incur if you bought target-size shares
-        # (by taking as many asks as necessary, lowest first)
+        """
+        The total expense you would incur if you bought target-size shares
+        (by taking as many asks as necessary, lowest first)
+        """
 
         total_expense = 0
         total_shares_we_can_buy = 0
         remaining_size = self._target_size
-        
+
         all_orders = list(self._sell_orders.values())
         all_orders.sort(key=lambda order: order.price)
         for order in all_orders:
@@ -49,13 +51,15 @@ class Book:
         return total_expense
 
     def get_income(self) -> Optional[int]:
-        # the total income you would receive if you sold target-size shares
-        # (by hitting as many bids as necessary, highest first)
+        """
+        The total income you would receive if you sold target-size shares
+        (by hitting as many bids as necessary, highest first).
+        """
 
         total_income = 0
         total_shares_we_can_sell = 0
         remaining_size = self._target_size
-        
+
         all_orders = list(self._buy_orders.values())
         all_orders.sort(key=lambda order: -order.price)
         for order in all_orders:
@@ -67,7 +71,7 @@ class Book:
             else:
                 total_income += remaining_size * order.price
                 remaining_size = 0
-    
+
         if total_shares_we_can_sell < self._target_size:
             return None
         return total_income
@@ -102,7 +106,7 @@ class Book:
             side=old_order.side,
             size=old_order.size - size,
         )
-        
+
         # In the future for efficiency maybe we can remove orders with size 0.
         if order_id in self._buy_orders:
             self._buy_orders[order_id] = new_order
@@ -111,8 +115,8 @@ class Book:
 
 
 def cli_function(input_file, output_file, target_size: int):
-    book = Book(target_size=target_size) 
-    for line in input_file.readlines():
+    book = Book(target_size=target_size)
+    for line_index, line in enumerate(input_file.readlines()):
         old_expense = book.get_expense()
         old_income = book.get_income()
 
@@ -120,8 +124,7 @@ def cli_function(input_file, output_file, target_size: int):
         if len(split_string) == 4:
             timestamp, literal_string, order_id, size = split_string
             book.create_reduce_order(order_id=order_id, size=int(size))
-
-        if len(split_string) == 6:
+        elif len(split_string) == 6:
             (
                 timestamp,
                 literal_string,
@@ -136,17 +139,17 @@ def cli_function(input_file, output_file, target_size: int):
                 side=Side(side_string),
                 size=int(size),
             )
-
-        # TODO handle if length is not 4 or 6
-        # Parse input:
-        # If BookAnalyzer encounters an error in an input message,
-        # it prints a warning to standard error and proceeds to the next message.
+        else:
+            output_file.write(
+                f"Warning: Invalid line (line {line_index + 1}), "
+                "see documentation for format\n"
+            )
 
         new_expense = book.get_expense()
         new_income = book.get_income()
         if new_expense != old_expense:
             if new_expense is None:
-                new_expense = 'NA'
+                new_expense = "NA"
             else:
                 new_expense = "{:.2f}".format(new_expense)
             message = timestamp + " B " + new_expense + "\n"
@@ -154,7 +157,7 @@ def cli_function(input_file, output_file, target_size: int):
 
         if new_income != old_income:
             if new_income is None:
-                new_income = 'NA'
+                new_income = "NA"
             else:
                 new_income = "{:.2f}".format(new_income)
             message = timestamp + " S " + str(new_income) + "\n"
@@ -163,7 +166,6 @@ def cli_function(input_file, output_file, target_size: int):
 
 # Task list:
 #
-# * Consider remaining TODOs
 # * Add docstrings
 # * Explain error input
 # * Consider performance / alternative implementations

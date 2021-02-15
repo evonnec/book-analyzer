@@ -14,12 +14,25 @@ Example, where 200 is the target size:
 
 ## Errors I considered
 
+I considered the following errors:
+
 * An order is added without S or B as the side
 * An order is added with an existing order ID
 * An order is reduced but the order ID does not exist
 * An order is reduced by more than the available size
 * The literal string given is not as expected
 * An input line is not of length 4 or 6
+
+I implemented error handling for the last error but did not handle the other error types for time purposes.
+
+## Quality
+
+I added tests for enough functionality that I am confident, but they are not thorough.
+I would add more in production.
+
+I added a few comments and docstrings but I would add more in production.
+
+I did not do thorough performance testing for time purposes.
 
 ## Questions
 
