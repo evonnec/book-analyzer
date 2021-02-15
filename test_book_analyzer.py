@@ -2,10 +2,10 @@ import unittest
 import textwrap
 from io import StringIO
 
-from book_analyzer import cli_function
+from book_analyzer import cli_function, Book, Side
+
 
 class TestExample(unittest.TestCase):
-
     def test_example(self):
         sample_input = textwrap.dedent(
             """
@@ -40,6 +40,29 @@ class TestExample(unittest.TestCase):
             output_file=test_output_file,
         )
         contents = test_output_file.getvalue()
+        # What we got:
+        #
+        # 28800538 S 4426.0
+        # 28800562 B 4410.0
+        # 28800744 S 0.0
+        # 28800758 B 11346.26
+        # 28800773 S 4438.0
+        # 28800796 B 4410.0
+        # 28800812 B 11346.26
+        # 28800974 S 8865.0
+        # 28800975 S 4427.0
+        # 28812071 B 6928.26
+        # 28813129 B 9112.26
+        # 28813300 B 6594.0
+        # 28813830 S 8845.0
+        # 28814087 S 53025.0
+        # 28814834 B 2184.0
+        # 28814864 B 6593.0
+        # 28815774 B 2184.0
+        # 28815804 B 9896.25
+        # 28815937 S 8845.0
+        # 28816245 S 13267.0
+
         expected_contents = textwrap.dedent(
             """\
             28800758 S 8832.56 
@@ -58,6 +81,92 @@ class TestExample(unittest.TestCase):
             """
         )
         assert contents == expected_contents
-        # Pretend that standard input is like the sample_input
-        # Pass that to our CLI function
-        # Check the output
+
+class TestBookExpense(unittest.TestCase):
+    def test_default(self):
+        book = Book(target_size=1)
+        result = book.get_expense()
+        assert result is None
+
+    def test_add_sell_order(self):
+        book = Book(target_size=1)
+        book.create_add_order(
+            order_id='abcde',
+            price=1,
+            side=Side.SELL,
+            size=2,
+        )
+        result = book.get_expense()
+        assert result == 2
+
+    def test_add_buy_order(self):
+        book = Book(target_size=1)
+        book.create_add_order(
+            order_id='abcde',
+            price=1,
+            side=Side.BUY,
+            size=2,
+        )
+        result = book.get_expense()
+        assert result is None
+
+    def test_reduce_order(self):
+        book = Book(target_size=1)
+        book.create_add_order(
+            order_id='abcde',
+            price=1,
+            side=Side.SELL,
+            size=2,
+        )
+        result = book.create_reduce_order(
+            order_id='abcde',
+            size=1,
+        )
+        result = book.get_expense()
+        assert result == 1
+    
+    def test_target_size_gt_available_shares(self):
+        book = Book(target_size=10)
+        book.create_add_order(
+            order_id='abcde',
+            price=1,
+            side=Side.SELL,
+            size=2,
+        )
+        result = book.get_expense()
+        assert result is None
+
+    def test_available_shares_various_prices(self):
+        book = Book(target_size=5)
+        book.create_add_order(
+            order_id='abcde',
+            price=1.50,
+            side=Side.SELL,
+            size=2,
+        ) # total: $3, size: 2
+
+        book.create_add_order(
+            order_id='bcdef',
+            price=2.10,
+            side=Side.SELL,
+            size=2,
+        )
+        book.create_add_order(
+            order_id='cdefg',
+            price=2.05,
+            side=Side.SELL,
+            size=2,
+        ) #total: $8.55, size: 5
+
+        book.create_add_order(
+            order_id='defgh',
+            price=1.75,
+            side=Side.SELL,
+            size=2,
+        ) # total: $6.50, size: 4
+        result = book.get_expense()
+        assert result == 8.55
+        
+        ## TO DO : reject duplicate order_id's
+# class TestBookIncome(unittest.TestCase):
+#     def test_sample_for_income(self):
