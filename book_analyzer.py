@@ -28,9 +28,6 @@ class Book:
         # the total expense you would incur if you bought target-size shares
         # (by taking as many asks as necessary, lowest first)
 
-        # TODO: Maybe we also need to know
-        # how many shares are available and does that >= the target size?
-
         total_expense = 0
         total_shares_we_can_buy = 0
         remaining_size = self._target_size
@@ -54,9 +51,6 @@ class Book:
     def get_income(self) -> Optional[int]:
         # the total income you would receive if you sold target-size shares
         # (by hitting as many bids as necessary, highest first)
-
-        # TODO: Maybe we also need to know
-        # how many shares are available and does that >= the target size?
 
         total_income = 0
         total_shares_we_can_sell = 0
@@ -85,8 +79,6 @@ class Book:
         side: Side,
         size: int,
     ) -> None:
-        # TODO handle if the order_id already exists
-
         new_order = Order(
             order_id=order_id,
             price=price,
@@ -99,10 +91,6 @@ class Book:
             self._sell_orders[order_id] = new_order
 
     def create_reduce_order(self, order_id: str, size: int) -> None:
-        # TODO handle if we try to reduce the size to below 0
-
-        # TODO handle if the order_id does not exist
-        # TO DO handle when the size is reduced to zero, to remove the order_id from the book completely
         if order_id in self._buy_orders:
             old_order = self._buy_orders[order_id]
         else:
@@ -115,6 +103,7 @@ class Book:
             size=old_order.size - size,
         )
         
+        # In the future for efficiency maybe we can remove orders with size 0.
         if order_id in self._buy_orders:
             self._buy_orders[order_id] = new_order
         else:
@@ -129,16 +118,10 @@ def cli_function(input_file, output_file, target_size: int):
 
         split_string = line.strip().split(" ")
         if len(split_string) == 4:
-            # If length is 4 it is a Reduce Order
-
-            # TODO handle if literal_string is not "R", show an error
             timestamp, literal_string, order_id, size = split_string
             book.create_reduce_order(order_id=order_id, size=int(size))
 
         if len(split_string) == 6:
-            # If length is 6 it is an Add Order
-
-            # TODO handle if side is not "B" or "S", show an error
             (
                 timestamp,
                 literal_string,
@@ -180,11 +163,10 @@ def cli_function(input_file, output_file, target_size: int):
 
 # Task list:
 #
-# * Get this working with the large sample input
 # * Consider remaining TODOs
-# * Handle error input
+# * Add docstrings
+# * Explain error input
 # * Consider performance / alternative implementations
-# * Write the README
 
 if __name__ == "__main__":
     target_size = int(sys.argv[1])

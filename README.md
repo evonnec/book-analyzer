@@ -12,17 +12,33 @@ Example, where 200 is the target size:
 
 `python -m unittest test_book_analyzer.py`
 
+## Errors I considered
+
+* An order is added without S or B as the side
+* An order is added with an existing order ID
+* An order is reduced but the order ID does not exist
+* An order is reduced by more than the available size
+* The literal string given is not as expected
+* An input line is not of length 4 or 6
+
 ## Questions
 
 * How did you choose your implementation language?
 
-I felt that this would be simplest to write in Python.
+I felt that this would be simplest to write in Python of the languages I am familiar with.
 
 * How did you arrive at your final implementation? Were there other approaches that you considered or tried first? 
 
 I started by writing the CLI function and calling functions from a Book class and created classes and functions as they were needed.
 
-I looked at using heapify in order to sort the orders on the book for purchases and sales to quicken the sorting.
+For storing orders, I tried two approaches:
+
+    1. Storing a dictionary of order IDs mapping to orders
+    2. Storing an ordered list of orders
+
+I tested this with large inputs and chose the fastest option.
+
+I considered alternatives such as binary insert and heaps but I stopped before trying these.
 
 * How does your implementation scale with respect to the target size?
 
