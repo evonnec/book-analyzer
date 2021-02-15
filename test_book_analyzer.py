@@ -7,6 +7,7 @@ from book_analyzer import cli_function, Book, Side
 
 class TestExample(unittest.TestCase):
     def test_example(self):
+        target_size = 200
         sample_input = textwrap.dedent(
             """
             28800538 A b S 44.26 100 
@@ -38,6 +39,7 @@ class TestExample(unittest.TestCase):
         cli_function(
             input_file=sample_input_file,
             output_file=test_output_file,
+            target_size=target_size,
         )
         contents = test_output_file.getvalue()
         
@@ -145,6 +147,6 @@ class TestBookExpense(unittest.TestCase):
         result = book.get_expense()
         assert result == 8.55
         
-        ## TO DO : reject duplicate order_id's
+##TO DO : reject duplicate order_id's
 # class TestBookIncome(unittest.TestCase):
 #     def test_sample_for_income(self):

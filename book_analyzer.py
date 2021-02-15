@@ -21,7 +21,8 @@ class Book:
     def __init__(self, target_size: int) -> None:
         self._target_size = target_size
         # Maps order_id to Order
-        self._orders = {}
+        self._buy_orders = {}
+        self._sell_orders = {}
 
     def get_expense(self) -> Optional[int]:
         # the total expense you would incur if you bought target-size shares
@@ -34,24 +35,23 @@ class Book:
         total_shares_we_can_buy = 0
         remaining_size = self._target_size
         
-        all_orders = list(self._orders.values())
+        all_orders = list(self._sell_orders.values())
         all_orders.sort(key=lambda order: order.price)
         for order in all_orders:
-            if order.side == Side.SELL:
-                total_shares_we_can_buy += order.size
+            total_shares_we_can_buy += order.size
 
-                if order.size <= remaining_size:
-                    total_expense += order.size * order.price
-                    remaining_size -= order.size
-                else:
-                    total_expense += remaining_size * order.price
-                    remaining_size = 0
-    
+            if order.size <= remaining_size:
+                total_expense += order.size * order.price
+                remaining_size -= order.size
+            else:
+                total_expense += remaining_size * order.price
+                remaining_size = 0
+
         if total_shares_we_can_buy < self._target_size:
             return None
         return total_expense
 
-    def get_income(self) -> int:
+    def get_income(self) -> Optional[int]:
         # the total income you would receive if you sold target-size shares
         # (by hitting as many bids as necessary, highest first)
 
@@ -62,18 +62,17 @@ class Book:
         total_shares_we_can_sell = 0
         remaining_size = self._target_size
         
-        all_orders = list(self._orders.values())
+        all_orders = list(self._buy_orders.values())
         all_orders.sort(key=lambda order: -order.price)
         for order in all_orders:
-            if order.side == Side.BUY:
-                total_shares_we_can_sell += order.size
+            total_shares_we_can_sell += order.size
 
-                if order.size <= remaining_size:
-                    total_income += order.size * order.price
-                    remaining_size -= order.size
-                else:
-                    total_income += remaining_size * order.price
-                    remaining_size = 0
+            if order.size <= remaining_size:
+                total_income += order.size * order.price
+                remaining_size -= order.size
+            else:
+                total_income += remaining_size * order.price
+                remaining_size = 0
     
         if total_shares_we_can_sell < self._target_size:
             return None
@@ -94,33 +93,36 @@ class Book:
             side=side,
             size=size,
         )
-
-        self._orders[order_id] = new_order
+        if side == Side.BUY:
+            self._buy_orders[order_id] = new_order
+        else:
+            self._sell_orders[order_id] = new_order
 
     def create_reduce_order(self, order_id: str, size: int) -> None:
         # TODO handle if we try to reduce the size to below 0
 
         # TODO handle if the order_id does not exist
         # TO DO handle when the size is reduced to zero, to remove the order_id from the book completely
+        if order_id in self._buy_orders:
+            old_order = self._buy_orders[order_id]
+        else:
+            old_order = self._sell_orders[order_id]
 
-        old_order = self._orders[order_id]
         new_order = Order(
             order_id=order_id,
             price=old_order.price,
             side=old_order.side,
             size=old_order.size - size,
         )
-        self._orders[order_id] = new_order
+        
+        if order_id in self._buy_orders:
+            self._buy_orders[order_id] = new_order
+        else:
+            self._sell_orders[order_id] = new_order
 
 
-book = Book(target_size=200)  # 200 is given from the user on the CLI
-
-# TODO deal with stdin
-# for line in sys.stdin:
-
-
-def cli_function(input_file, output_file):
-
+def cli_function(input_file, output_file, target_size: int):
+    book = Book(target_size=target_size) 
     for line in input_file.readlines():
         old_expense = book.get_expense()
         old_income = book.get_income()
@@ -178,16 +180,16 @@ def cli_function(input_file, output_file):
 
 # Task list:
 #
-# * Get this working with the tiny sample input data at the bottom of the Google Doc
-#    with hand-copied input
-# * Get this working with the tiny sample input data in a nice way, reading stdin
 # * Get this working with the large sample input
 # * Consider remaining TODOs
 # * Handle error input
 # * Consider performance / alternative implementations
+# * Write the README
 
 if __name__ == "__main__":
+    target_size = int(sys.argv[1])
     cli_function(
         input_file=sys.stdin,
         output_file=sys.stdout,
+        target_size=target_size,
     )
