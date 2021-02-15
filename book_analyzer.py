@@ -63,7 +63,7 @@ class Book:
         remaining_size = self._target_size
         
         all_orders = list(self._orders.values())
-        all_orders.sort(key=lambda order: order.price)
+        all_orders.sort(key=lambda order: -order.price)
         for order in all_orders:
             if order.side == Side.BUY:
                 total_shares_we_can_sell += order.size
@@ -160,10 +160,18 @@ def cli_function(input_file, output_file):
         new_expense = book.get_expense()
         new_income = book.get_income()
         if new_expense != old_expense:
-            message = timestamp + " B " + str(new_expense) + "\n"
+            if new_expense is None:
+                new_expense = 'NA'
+            else:
+                new_expense = "{:.2f}".format(new_expense)
+            message = timestamp + " B " + new_expense + "\n"
             output_file.write(message)
 
         if new_income != old_income:
+            if new_income is None:
+                new_income = 'NA'
+            else:
+                new_income = "{:.2f}".format(new_income)
             message = timestamp + " S " + str(new_income) + "\n"
             output_file.write(message)
 

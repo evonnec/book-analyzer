@@ -40,43 +40,21 @@ class TestExample(unittest.TestCase):
             output_file=test_output_file,
         )
         contents = test_output_file.getvalue()
-        # What we got:
-        #
-        # 28800538 S 4426.0
-        # 28800562 B 4410.0
-        # 28800744 S 0.0
-        # 28800758 B 11346.26
-        # 28800773 S 4438.0
-        # 28800796 B 4410.0
-        # 28800812 B 11346.26
-        # 28800974 S 8865.0
-        # 28800975 S 4427.0
-        # 28812071 B 6928.26
-        # 28813129 B 9112.26
-        # 28813300 B 6594.0
-        # 28813830 S 8845.0
-        # 28814087 S 53025.0
-        # 28814834 B 2184.0
-        # 28814864 B 6593.0
-        # 28815774 B 2184.0
-        # 28815804 B 9896.25
-        # 28815937 S 8845.0
-        # 28816245 S 13267.0
-
+        
         expected_contents = textwrap.dedent(
             """\
-            28800758 S 8832.56 
-            28800796 S NA 
-            28800812 S 8832.56 
-            28800974 B 8865.00 
-            28800975 B NA 
-            28812071 S NA 
-            28813129 S 8806.50 
-            28813300 S NA 
-            28813830 B 8845.00 
-            28814087 B 8836.00 
-            28815804 S 8804.25 
-            28815937 B 8845.00 
+            28800758 S 8832.56
+            28800796 S NA
+            28800812 S 8832.56
+            28800974 B 8865.00
+            28800975 B NA
+            28812071 S NA
+            28813129 S 8806.50
+            28813300 S NA
+            28813830 B 8845.00
+            28814087 B 8836.00
+            28815804 S 8804.25
+            28815937 B 8845.00
             28816245 B 8840.00
             """
         )
@@ -92,12 +70,12 @@ class TestBookExpense(unittest.TestCase):
         book = Book(target_size=1)
         book.create_add_order(
             order_id='abcde',
-            price=1,
+            price=3,
             side=Side.SELL,
             size=2,
         )
         result = book.get_expense()
-        assert result == 2
+        assert result == 3
 
     def test_add_buy_order(self):
         book = Book(target_size=1)
