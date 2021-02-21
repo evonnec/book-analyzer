@@ -8,6 +8,7 @@ class Side(Enum):
     """
     Type Side for Order class
     """
+
     BUY = "B"
     SELL = "S"
 
@@ -17,6 +18,7 @@ class Order:
     """
     Order data decorator
     """
+
     order_id: str
     price: float
     side: Side
@@ -28,6 +30,7 @@ class Book:
     a book keeps a running/current list of unique orders
     divided into two books for bids/offers for performance, but this is likely not optimal.
     """
+
     def __init__(self, target_size: int) -> None:
         self._target_size = target_size
         # Maps order_id to Order
@@ -62,7 +65,7 @@ class Book:
 
     def get_income(self) -> Optional[int]:
         """
-        The total income you would receive if you sold shares up to the target-size 
+        The total income you would receive if you sold shares up to the target-size
         (by hitting as many bids as necessary, highest first, until target size is filled).
         """
 
@@ -132,9 +135,9 @@ class Book:
 
 def cli_function(input_file, output_file, target_size: int):
     """
-    makes a book class, iters thru input, determines order type A(dd) or R(emove), 
+    makes a book class, iters thru input, determines order type A(dd) or R(emove),
     runs create_add_order or create_reduce_order function, handles formatting.
-    With more time, would split out formatting to it's own function to be called, 
+    With more time, would split out formatting to it's own function to be called,
     Also some code duplication here in formatting, with more time, pass Side to determine if it's expense or income.
     would use try-except-finally clause instead of if-then, and give it separate error handling.
     """
@@ -186,6 +189,7 @@ def cli_function(input_file, output_file, target_size: int):
                 new_income = "{:.2f}".format(new_income)
             message = timestamp + " S " + str(new_income) + "\n"
             output_file.write(message)
+
 
 if __name__ == "__main__":
     target_size = int(sys.argv[1])

@@ -99,7 +99,7 @@ class TestBookExpense(unittest.TestCase):
             side=Side.SELL,
             size=2,
         )
-        result = book.create_reduce_order(
+        book.create_reduce_order(
             order_id="abcde",
             size=1,
         )

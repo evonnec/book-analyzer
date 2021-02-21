@@ -42,8 +42,8 @@ I did not do thorough performance testing for time purposes.
 * Add a __lt__ around market rules such as price first, timestamp second.
 * Insert orders in order for bids and offers, to avoid sorting them later which is an expensive task for a large book.
 * Or use a data structure that allows for that such as heaps.
-* Maintain a data structure of orders that would fill to the target size for both bids and offers, then separate data structures for bids and offers books to fill that primary data structure when there are executions or cancellations (i.e. the order gets removed from the book)
-* Maybe use heap data structures or bisect library for ordered orders for the 3 data structures (target size bids/offers, rest of bids, rest of offers) to more quickly pop and push.
+* Maintain a primary data structure of orders that would fill to the target size for both bids and offers, then separate data structures for bids and offers books to backfill that primary data structure when there are executions or cancellations (i.e. the order gets removed from the book)
+* Maybe use heap data structures or bisect library for ordered orders for the 3 data structures (target size bids/offers, rest of bids, rest of offers) to more quickly access.
 
 ## Questions
 
@@ -60,7 +60,7 @@ For storing orders, I tried two approaches:
     1. Storing a dictionary of order IDs mapping to orders
     2. Storing an ordered list of orders
 
-I tested this with a subset of the large input provided and chose the fastest option.
+I tested this with a subset of the large input provided and chose the faster option.
 
 I considered alternatives such as bisect and heapq but I stopped before trying these. 
 
