@@ -5,12 +5,18 @@ from typing import Optional
 
 
 class Side(Enum):
+    """
+    Type Side for Order class
+    """
     BUY = "B"
     SELL = "S"
 
 
 @dataclass
 class Order:
+    """
+    Order data decorator
+    """
     order_id: str
     price: float
     side: Side
@@ -18,6 +24,10 @@ class Order:
 
 
 class Book:
+    """
+    a book keeps a running/current list of unique orders
+    divided into two books for bids/offers for performance, but this is likely not optimal.
+    """
     def __init__(self, target_size: int) -> None:
         self._target_size = target_size
         # Maps order_id to Order
@@ -26,8 +36,8 @@ class Book:
 
     def get_expense(self) -> Optional[int]:
         """
-        The total expense you would incur if you bought target-size shares
-        (by taking as many asks as necessary, lowest first)
+        The total expense you would incur if you bought shares up to the target-size
+        (by taking as many asks as necessary, lowest first, until target-size is filled)
         """
 
         total_expense = 0
@@ -52,8 +62,8 @@ class Book:
 
     def get_income(self) -> Optional[int]:
         """
-        The total income you would receive if you sold target-size shares
-        (by hitting as many bids as necessary, highest first).
+        The total income you would receive if you sold shares up to the target-size 
+        (by hitting as many bids as necessary, highest first, until target size is filled).
         """
 
         total_income = 0
@@ -83,6 +93,9 @@ class Book:
         side: Side,
         size: int,
     ) -> None:
+        """
+        if readlines length is 6, creates an add order to the book
+        """
         new_order = Order(
             order_id=order_id,
             price=price,
@@ -95,6 +108,9 @@ class Book:
             self._sell_orders[order_id] = new_order
 
     def create_reduce_order(self, order_id: str, size: int) -> None:
+        """
+        if readlines length is 4, creates reduce order to the book
+        """
         if order_id in self._buy_orders:
             old_order = self._buy_orders[order_id]
         else:
@@ -107,7 +123,7 @@ class Book:
             size=old_order.size - size,
         )
 
-        # In the future for efficiency maybe we can remove orders with size 0.
+        # In the future for efficiency reasons, we can remove orders with size 0.
         if order_id in self._buy_orders:
             self._buy_orders[order_id] = new_order
         else:
@@ -115,6 +131,13 @@ class Book:
 
 
 def cli_function(input_file, output_file, target_size: int):
+    """
+    makes a book class, iters thru input, determines order type A(dd) or R(emove), 
+    runs create_add_order or create_reduce_order function, handles formatting.
+    With more time, would split out formatting to it's own function to be called, 
+    Also some code duplication here in formatting, with more time, pass Side to determine if it's expense or income.
+    would use try-except-finally clause instead of if-then, and give it separate error handling.
+    """
     book = Book(target_size=target_size)
     for line_index, line in enumerate(input_file.readlines()):
         old_expense = book.get_expense()
@@ -140,6 +163,7 @@ def cli_function(input_file, output_file, target_size: int):
                 size=int(size),
             )
         else:
+            # if readlines length is not 4 or 6, write error msg to std output with where it's coming from
             output_file.write(
                 f"Warning: Invalid line (line {line_index + 1}), "
                 "see documentation for format\n"
@@ -162,13 +186,6 @@ def cli_function(input_file, output_file, target_size: int):
                 new_income = "{:.2f}".format(new_income)
             message = timestamp + " S " + str(new_income) + "\n"
             output_file.write(message)
-
-
-# Task list:
-#
-# * Add docstrings
-# * Explain error input
-# * Consider performance / alternative implementations
 
 if __name__ == "__main__":
     target_size = int(sys.argv[1])

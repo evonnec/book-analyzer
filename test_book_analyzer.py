@@ -137,7 +137,6 @@ class TestBookExpense(unittest.TestCase):
             side=Side.SELL,
             size=2,
         )
-
         book.create_add_order(
             order_id="defgh",
             price=1.75,
