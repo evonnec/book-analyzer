@@ -145,3 +145,6 @@ class TestBookExpense(unittest.TestCase):
         )
         result = book.get_expense()
         assert result == 8.55
+
+if __name__ == '__main__':
+    unittest.main()
