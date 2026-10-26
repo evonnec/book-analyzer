@@ -163,7 +163,6 @@ class TestCommandNames:
         scripts = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["scripts"]
         assert scripts["book-analyzer"] == "book_analyzer.__main__:entry"
 
-    @xfail("#15", "the specification's name BookAnalyzer is not installed")
     def test_specification_command_name_is_declared(self) -> None:
         scripts = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["scripts"]
         assert scripts["BookAnalyzer"] == "book_analyzer.__main__:entry"

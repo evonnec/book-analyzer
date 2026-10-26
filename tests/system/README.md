@@ -38,7 +38,7 @@ timing, so nothing here depends on machine speed.
 
 Every known defect is a strict xfail whose reason starts with the GitHub issue number, for
 example `#9: warnings are written to stdout`. A scenario that needs earlier fixes is tagged with
-the last one in the fix order (#7, #8, #9, #10/#11/#12, then #14/#15) and says so:
+the last one in the fix order (#7, #8, #9, #10/#11/#12, then #14) and says so:
 `#9 (needs #7, #8)`. When a fix lands, its xfails turn into XPASS(strict), which fails the run:
 delete the `xfail` marks tagged with that issue and the tests become regular tests.
 
@@ -53,7 +53,7 @@ delete the `xfail` marks tagged with that issue and the tests become regular tes
 | #11 | argument matrix, `--help`, closed pipe, SIGINT |
 | #12 | a result line arrives before stdin is closed (with `--line-buffered`) |
 | #14 | rejected-message summary and `--strict` |
-| #15 | the `BookAnalyzer` command name |
+
 
 The #10, #12 and #14 tests assume the names given in the issues (`--line-buffered`, `--strict`,
 a `rejected N` summary line on stderr, exit statuses 2, 130 and 141); adjust them if the
