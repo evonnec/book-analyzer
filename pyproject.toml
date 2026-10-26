@@ -59,7 +59,9 @@ mypy_path = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+# tests/system holds helper modules (system_*.py) shared by its test modules; with importlib
+# import mode and no __init__.py they are importable only through this path.
+pythonpath = ["src", "tests/system"]
 addopts = ["--import-mode=importlib"]
 
 [tool.coverage.report]

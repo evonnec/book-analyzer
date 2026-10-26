@@ -144,7 +144,7 @@ class TestReduce:
 
     @pytest.mark.xfail(
         strict=True,
-        reason="orders reduced to <= 0 stay in the book, so a negative size offsets other orders",
+        reason="#7: orders reduced to <= 0 stay in the book, so a negative size offsets others",
     )
     def test_over_reduce_does_not_offset_other_orders(self) -> None:
         book = make_book(2, ("a", SELL, 1, 1), ("b", SELL, 2, 5))

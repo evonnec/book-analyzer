@@ -63,7 +63,7 @@ class TestSubprocess:
         result = run_module("5", stdin="1 A a S 1.00 1\n")
         assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
 
-    @pytest.mark.xfail(strict=True, reason="warnings are written to stdout instead of stderr")
+    @pytest.mark.xfail(strict=True, reason="#9: warnings are written to stdout instead of stderr")
     def test_warning_is_on_stderr(self) -> None:
         result = run_module("1", stdin="1 A a S 1.00 1\nbad\n")
         assert result.returncode == 0
@@ -76,30 +76,33 @@ class TestSubprocess:
             pytest.param(
                 [],
                 marks=pytest.mark.xfail(
-                    strict=True, reason="missing TARGET_SIZE crashes with an IndexError traceback"
+                    strict=True,
+                    reason="#11: missing TARGET_SIZE crashes with an IndexError traceback",
                 ),
             ),
             pytest.param(
                 ["abc"],
                 marks=pytest.mark.xfail(
                     strict=True,
-                    reason="non-integer TARGET_SIZE crashes with a ValueError traceback",
+                    reason="#11: non-integer TARGET_SIZE crashes with a ValueError traceback",
                 ),
             ),
             pytest.param(
                 ["1.5"],
                 marks=pytest.mark.xfail(
                     strict=True,
-                    reason="non-integer TARGET_SIZE crashes with a ValueError traceback",
+                    reason="#11: non-integer TARGET_SIZE crashes with a ValueError traceback",
                 ),
             ),
             pytest.param(
                 ["0"],
-                marks=pytest.mark.xfail(strict=True, reason="zero TARGET_SIZE is accepted"),
+                marks=pytest.mark.xfail(strict=True, reason="#11: zero TARGET_SIZE is accepted"),
             ),
             pytest.param(
                 ["-5"],
-                marks=pytest.mark.xfail(strict=True, reason="negative TARGET_SIZE is accepted"),
+                marks=pytest.mark.xfail(
+                    strict=True, reason="#11: negative TARGET_SIZE is accepted"
+                ),
             ),
         ],
     )

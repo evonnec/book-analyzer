@@ -60,46 +60,48 @@ class TestParseLine:
         [
             pytest.param(
                 "1 A a S cheap 1",
-                marks=pytest.mark.xfail(strict=True, reason="non-numeric price raises ValueError"),
+                marks=pytest.mark.xfail(
+                    strict=True, reason="#9: non-numeric price raises ValueError"
+                ),
             ),
             pytest.param(
                 "1 A a S 1.00 many",
                 marks=pytest.mark.xfail(
-                    strict=True, reason="non-numeric add size raises ValueError"
+                    strict=True, reason="#9: non-numeric add size raises ValueError"
                 ),
             ),
             pytest.param(
                 "1 R a many",
                 marks=pytest.mark.xfail(
-                    strict=True, reason="non-numeric reduce size raises ValueError"
+                    strict=True, reason="#9: non-numeric reduce size raises ValueError"
                 ),
             ),
             pytest.param(
                 "1 A a X 1.00 1",
-                marks=pytest.mark.xfail(strict=True, reason="unknown side raises ValueError"),
+                marks=pytest.mark.xfail(strict=True, reason="#9: unknown side raises ValueError"),
             ),
             pytest.param(
                 "1 A a 4",
                 marks=pytest.mark.xfail(
-                    strict=True, reason="message type is ignored: 4 fields parse as a reduce"
+                    strict=True, reason="#9: message type is ignored: 4 fields parse as a reduce"
                 ),
             ),
             pytest.param(
                 "1 X a 4",
                 marks=pytest.mark.xfail(
-                    strict=True, reason="message type is ignored: 4 fields parse as a reduce"
+                    strict=True, reason="#9: message type is ignored: 4 fields parse as a reduce"
                 ),
             ),
             pytest.param(
                 "1 R a S 1.00 1",
                 marks=pytest.mark.xfail(
-                    strict=True, reason="message type is ignored: 6 fields parse as an add"
+                    strict=True, reason="#9: message type is ignored: 6 fields parse as an add"
                 ),
             ),
             pytest.param(
                 "1 X a S 1.00 1",
                 marks=pytest.mark.xfail(
-                    strict=True, reason="message type is ignored: 6 fields parse as an add"
+                    strict=True, reason="#9: message type is ignored: 6 fields parse as an add"
                 ),
             ),
         ],
@@ -125,7 +127,7 @@ class TestFormatUpdate:
 
 
 class TestSpecificationSample:
-    @pytest.mark.xfail(strict=True, reason="warnings are written to stdout instead of stderr")
+    @pytest.mark.xfail(strict=True, reason="#9: warnings are written to stdout instead of stderr")
     def test_sample(self, sample_input: str, sample_expected: str) -> None:
         # The sample starts with a blank line, which produces a warning on stdout.
         assert run_log(sample_input) == sample_expected
@@ -164,7 +166,7 @@ class TestRun:
         assert output.count("Warning") == 1
         assert "line 2" in output
 
-    @pytest.mark.xfail(strict=True, reason="warnings are written to stdout instead of stderr")
+    @pytest.mark.xfail(strict=True, reason="#9: warnings are written to stdout instead of stderr")
     @pytest.mark.parametrize("bad_line", ["", "2 A a", "2 A a S 1.00 1 extra"])
     def test_warning_goes_to_stderr(
         self, bad_line: str, capsys: pytest.CaptureFixture[str]
@@ -193,40 +195,48 @@ class TestMalformedMessagesAreSkipped:
             "2 R a 1 1",
             pytest.param(
                 "2 A q S cheap 1",
-                marks=pytest.mark.xfail(strict=True, reason="non-numeric price raises ValueError"),
+                marks=pytest.mark.xfail(
+                    strict=True, reason="#9: non-numeric price raises ValueError"
+                ),
             ),
             pytest.param(
                 "2 A q S 1.00 many",
-                marks=pytest.mark.xfail(strict=True, reason="non-numeric size raises ValueError"),
+                marks=pytest.mark.xfail(
+                    strict=True, reason="#9: non-numeric size raises ValueError"
+                ),
             ),
             pytest.param(
                 "2 R a many",
-                marks=pytest.mark.xfail(strict=True, reason="non-numeric size raises ValueError"),
+                marks=pytest.mark.xfail(
+                    strict=True, reason="#9: non-numeric size raises ValueError"
+                ),
             ),
             pytest.param(
                 "2 A q X 1.00 1",
-                marks=pytest.mark.xfail(strict=True, reason="unknown side raises ValueError"),
+                marks=pytest.mark.xfail(strict=True, reason="#9: unknown side raises ValueError"),
             ),
             pytest.param(
                 "2 R nope 1",
-                marks=pytest.mark.xfail(strict=True, reason="reduce of unknown id raises KeyError"),
+                marks=pytest.mark.xfail(
+                    strict=True, reason="#9: reduce of unknown id raises KeyError"
+                ),
             ),
             pytest.param(
                 "2 A a S 5.00 5",
                 marks=pytest.mark.xfail(
-                    strict=True, reason="duplicate add silently replaces the existing order"
+                    strict=True, reason="#9: duplicate add silently replaces the existing order"
                 ),
             ),
             pytest.param(
                 "2 X a 4",
                 marks=pytest.mark.xfail(
-                    strict=True, reason="message type is ignored: 4 fields apply as a reduce"
+                    strict=True, reason="#9: message type is ignored: 4 fields apply as a reduce"
                 ),
             ),
             pytest.param(
                 "2 R q S 0.50 1",
                 marks=pytest.mark.xfail(
-                    strict=True, reason="message type is ignored: 6 fields apply as an add"
+                    strict=True, reason="#9: message type is ignored: 6 fields apply as an add"
                 ),
             ),
         ],
@@ -239,7 +249,7 @@ class TestMalformedMessagesAreSkipped:
 class TestKnownNumericDefects:
     @pytest.mark.xfail(
         strict=True,
-        reason="totals are float sums compared with !=, so float noise prints a duplicate line",
+        reason="#8: totals are float sums compared with !=, so float noise prints a duplicate line",
     )
     def test_reordered_sum_does_not_repeat_a_line(self) -> None:
         # Message 5 removes order "a" (the fill is still 0.10 + 0.70 + 0.70 + 0.70), but the
@@ -254,28 +264,28 @@ class TestKnownNumericDefects:
                 "0.015",
                 "0.02",
                 marks=pytest.mark.xfail(
-                    strict=True, reason="float formatting rounds 0.015 down instead of half up"
+                    strict=True, reason="#8: float formatting rounds 0.015 down instead of half up"
                 ),
             ),
             pytest.param(
                 "0.125",
                 "0.13",
                 marks=pytest.mark.xfail(
-                    strict=True, reason="float formatting rounds exact ties half to even"
+                    strict=True, reason="#8: float formatting rounds exact ties half to even"
                 ),
             ),
             pytest.param(
                 "1.005",
                 "1.01",
                 marks=pytest.mark.xfail(
-                    strict=True, reason="float formatting rounds 1.005 down instead of half up"
+                    strict=True, reason="#8: float formatting rounds 1.005 down instead of half up"
                 ),
             ),
             pytest.param(
                 "2.675",
                 "2.68",
                 marks=pytest.mark.xfail(
-                    strict=True, reason="float formatting rounds 2.675 down instead of half up"
+                    strict=True, reason="#8: float formatting rounds 2.675 down instead of half up"
                 ),
             ),
             ("0.014", "0.01"),
@@ -314,7 +324,7 @@ class LazyInput:
 
 class TestStreaming:
     @pytest.mark.xfail(
-        strict=True, reason="stdin is consumed with readlines() before any output is written"
+        strict=True, reason="#12: stdin is consumed with readlines() before any output is written"
     )
     def test_output_is_written_before_input_is_exhausted(self) -> None:
         output = StringIO()
