@@ -68,7 +68,7 @@ jobs:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
       - run: uv sync --locked --all-groups
-      - run: uv run pytest --cov=book_analyzer --cov-report=term-missing --cov-report=xml
+      - run: uv run pytest --cov=book_analyzer --cov-report=term-missing --cov-report=xml --cov-fail-under=100
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-py${{ matrix.python-version }}
