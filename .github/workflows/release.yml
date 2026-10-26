@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release (e.g. v1.2.3)"
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build and publish GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          python-version-file: .python-version
+      - name: Validate tag format
+        run: |
+          # vX.Y.Z with an optional PEP 440 suffix (rc1, a1, b2, .post1, .dev1), no leading zeros
+          re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)((a|b|rc)(0|[1-9][0-9]*)|\.post(0|[1-9][0-9]*)|\.dev(0|[1-9][0-9]*))?$'
+          if [[ ! "$TAG" =~ $re ]]; then
+            echo "::error::Tag $TAG is not a valid version tag (expected vX.Y.Z, or vX.Y.ZrcN style; note 1.2.3-rc.1 must be written 1.2.3rc1)"
+            exit 1
+          fi
+      - run: uv sync --locked --all-groups
+      - name: Verify tag matches project version
+        run: |
+          version="$(uv version --short)"
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::Tag $TAG does not match project.version $version in pyproject.toml"
+            exit 1
+          fi
+      - run: uv run ruff check --output-format=github .
+      - run: uv run ruff format --check .
+      - run: uv run mypy src tests
+      - run: uv run pytest
+      - run: uv build
+      - name: Smoke test built wheel in a clean environment
+        run: |
+          uv venv "$RUNNER_TEMP/smoke"
+          uv pip install --python "$RUNNER_TEMP/smoke" dist/*.whl
+          cd "$RUNNER_TEMP"
+          echo "1 A a S 1.00 1" | "$RUNNER_TEMP/smoke/bin/book-analyzer" 1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=()
+          # Anything other than vX.Y.Z or vX.Y.Z.postN (e.g. v1.0.0rc1) is marked as a pre-release.
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(\.post[0-9]+)?$ ]]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$TAG" dist/* --title "$TAG" --generate-notes --verify-tag "${flags[@]}"
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: release
+    # Off by default: set the repository variable PUBLISH_TO_PYPI to 'true' to enable.
+    if: ${{ vars.PUBLISH_TO_PYPI == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/book-analyzer/
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - run: uv publish --trusted-publishing always dist/*
