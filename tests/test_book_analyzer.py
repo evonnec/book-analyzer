@@ -2,7 +2,7 @@ import unittest
 import textwrap
 from io import StringIO
 
-from book_analyzer import cli_function, Book, Side
+from book_analyzer.cli import cli_function, Book, Side
 
 
 class TestExample(unittest.TestCase):
