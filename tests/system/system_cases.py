@@ -52,19 +52,18 @@ def expected(seed: int, messages: int, target: int, over_reduce_rate: float = 0.
 def xfail(issue: str, why: str) -> pytest.MarkDecorator:
     """A strict xfail whose reason starts with the issue number, e.g. "#9: ...".
 
-    Use "#9 (needs #7, #8)" as the issue when a scenario depends on earlier fixes: it is then
+    Use "#9 (needs #8)" as the issue when a scenario depends on earlier fixes: it is then
     expected to flip when the last of them lands.
     """
     return pytest.mark.xfail(strict=True, reason=f"{issue}: {why}")
 
 
-# Generated markets re-use ids across sides after removal (needs #7: dead orders) and end in
-# the float trap (needs #8: exact money). At target 1 no sum is ever taken, so only #7 stands
-# in the way.
-MARKET_MARKS = {
-    1: xfail("#7", "removed orders stay in the book and shadow re-used ids"),
-    200: xfail("#8 (needs #7)", "float totals print repeated lines"),
-    5000: xfail("#8 (needs #7)", "float totals print repeated lines"),
+# Generated markets end in the float trap (needs #8: exact money). At target 1 no sum is ever
+# taken, so they already match the oracle.
+MARKET_MARKS: dict[int, tuple[pytest.MarkDecorator, ...]] = {
+    1: (),
+    200: (xfail("#8", "float totals print repeated lines"),),
+    5000: (xfail("#8", "float totals print repeated lines"),),
 }
 
 

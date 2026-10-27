@@ -83,21 +83,22 @@ descending for bids) and accumulate `size * price` until `TARGET_SIZE` shares ar
 only part of the last level if needed. `apply` computes both totals before and after the change
 and reports a side only if its total differs.
 
-Complexity as currently implemented: orders are never removed (a reduce to zero leaves a
-zero-size order in the dict, see #7), so n is every order ever added, not the resting orders.
-Each message calls `get_expense` and `get_income` twice (before and after the change), which is
-four full sorts of a side per message with no early exit, so a message costs O(n log n) and a log
-of m messages O(m n log n), quadratic in practice. Running time grows with the log, not with the
-target size: a small target only lets the accumulation loop stop sooner after the sort. On the
-1.19M-message reference log this is about 2.5 CPU-days per target. Keeping only live orders and
-the sides ordered (or only the orders that fill the target) would fix this; neither is
-implemented.
+A reduce by at least an order's remaining size deletes the order, so the book holds only resting
+orders.
+
+Complexity as currently implemented: each message calls `get_expense` and `get_income` twice
+(before and after the change), which is four full sorts of a side per message, so a message costs
+O(n log n) in the number of resting orders n and a log of m messages O(m n log n). Running time
+grows with book depth, not with the target size beyond the accumulation loop stopping early. On
+the 1.19M-message reference log (at most about 230 resting orders) a target size takes roughly a
+minute of CPU. Keeping each side ordered by price level and recomputing only the side a message
+touches would remove the sorts (#10).
 
 ## Known issues
 
 Behavior is deliberately unchanged for now. The test suite pins each of these with a strict
 `xfail`, which fails once the defect is fixed so the marker has to be removed. Fixes are tracked
-in issues: #7 dead orders and over-reduce, #8 float money and rounding, #9 error handling,
+in issues: #8 float money and rounding, #9 error handling,
 #11 CLI argument handling, #12 streaming.
 
 - Totals are summed as floats and compared with `!=`, so a total that changes only by float noise
@@ -107,8 +108,6 @@ in issues: #7 dead orders and over-reduce, #8 float money and rounding, #9 error
 - Warnings are written to stdout, not stderr. (#9)
 - A non-numeric size or price, or an unknown side, raises `ValueError` and aborts the run. (#9)
 - Reducing an unknown order id raises `KeyError`. (#9)
-- Orders reduced to zero are never removed, and an over-reduce takes the size below zero, which
-  can corrupt later totals. Dead orders also slow every message, see Design. (#7)
 - Adding an id that already exists silently replaces the order. (#9)
 - The message type field (`A`/`R`) is ignored; messages are classified by field count. (#9)
 - A missing, non-integer, zero or negative `TARGET_SIZE` is not rejected with a usage error. (#11)
@@ -153,11 +152,11 @@ BOOK_ANALYZER_DATA=/path/to/data BOOK_ANALYZER_DATA_LINES=10000 uv run pytest te
 
 `BOOK_ANALYZER_DATA_LINES` limits the input to its first N lines, extended to the end of the
 last line's timestamp so that no message is split from its timestamp, and compares against the
-reference lines up to that timestamp. The default is the whole file (1.19M messages), which the current
-implementation needs about 2.5 CPU-days per target size to process (see Design, #7).
+reference lines up to that timestamp. The default is the whole file (1.19M messages), about a minute of
+CPU per target size.
 
-Current status: with `BOOK_ANALYZER_DATA_LINES=10000`, target sizes 1 and 10000 match and 200
-fails because of the float defect (an extra line is printed). The test asserts exact equality and
+Current status: on the whole file, target sizes 1 and 10000 match exactly and 200 prints 411 extra
+lines, each repeating the previous line for its side, because of the float defect (#8). The test asserts exact equality and
 is not marked xfail, since it is opt-in.
 
 ## Benchmark
@@ -172,8 +171,7 @@ uv run python benchmarks/bench.py                              # 5,000 messages,
 uv run python benchmarks/bench.py --messages 100000 --target 10000 --seed 7
 ```
 
-The default is small because the current code is quadratic (#7); raise `--messages` once that is
-fixed. Numbers depend on the machine, so compare runs on the same one.
+Numbers depend on the machine, so compare runs on the same one.
 
 ## Releasing
 

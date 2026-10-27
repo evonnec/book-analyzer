@@ -16,7 +16,7 @@ from system_run import CliResult, mentions_line, run_in_process, run_subprocess
 BOM = chr(0xFEFF)
 MESSAGES = scaled(3000)
 FULL_STACK = xfail(
-    "#9 (needs #7, #8)", "generated errors need dead-order removal, exact sums, validation"
+    "#9 (needs #8)", "generated errors need dead-order removal, exact sums, validation"
 )
 
 
@@ -58,12 +58,10 @@ def test_injected_market_expectation_is_consistent() -> None:
 
 PRELUDE = ["1 A a S 1.00 5", "2 A r B 2.00 1", "3 R r 1"]  # live: a; removed: r
 FOLLOW_UP = "5 A z B 3.00 2"
-NEEDS_DEAD_ORDER_REMOVAL = {"reduce of removed id"}
 
 
 def class_param(name: str) -> object:
-    issue = "#9 (needs #7)" if name in NEEDS_DEAD_ORDER_REMOVAL else "#9"
-    return pytest.param(name, marks=xfail(issue, f"'{name}' is not validated"), id=name)
+    return pytest.param(name, marks=xfail("#9", f"'{name}' is not validated"), id=name)
 
 
 @pytest.mark.parametrize("name", [class_param(name) for name in BAD_LINE_CLASSES])

@@ -117,23 +117,12 @@ class Book:
             self._sell_orders[order_id] = new_order
 
     def create_reduce_order(self, order_id: str, size: int) -> None:
-        """Reduce the size of an existing order."""
-        if order_id in self._buy_orders:
-            old_order = self._buy_orders[order_id]
-        else:
-            old_order = self._sell_orders[order_id]
-
-        new_order = Order(
-            order_id=order_id,
-            price=old_order.price,
-            side=old_order.side,
-            size=old_order.size - size,
-        )
-
-        if order_id in self._buy_orders:
-            self._buy_orders[order_id] = new_order
-        else:
-            self._sell_orders[order_id] = new_order
+        """Reduce an existing order by size; reducing by its remaining size or more removes it."""
+        orders = self._buy_orders if order_id in self._buy_orders else self._sell_orders
+        order = orders[order_id]
+        order.size -= min(size, order.size)
+        if order.size == 0:
+            del orders[order_id]
 
     def apply(self, message: Message) -> tuple[Update, ...]:
         """Apply a message and return the totals it changed (buy first, then sell)."""
