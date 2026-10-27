@@ -17,9 +17,31 @@ def scaled(messages: int) -> int:
     return max(1, int(messages * SCALE))
 
 
+def float_trap(after: Market) -> list[str]:
+    """A deterministic tail on which float sums repeat a line at targets 200 and 5000.
+
+    Asks far below the market become the best asks; removing `trapa` leaves the exact total
+    unchanged (`trapb` covers the share at the same price), but the float sum is taken over
+    different terms and differs in the last bit (139.39999999999998 against 139.4 at target
+    200). So the #8 xfails of the generated markets do not hang on whether a random market
+    happens to hit float noise (with few messages, or a #7 fix that sums in another order).
+    Target 1 takes no sums, so it still needs only #7.
+    """
+    timestamp = int(after.lines[-1].split()[0]) + 1 if after.lines else 1
+    return [
+        f"{timestamp} A trap0 S 0.10 1",
+        f"{timestamp} A trap1 S 0.70 1",
+        f"{timestamp} A trapa S 0.70 1",
+        f"{timestamp} A trapb S 0.70 6000",
+        f"{timestamp + 1} R trapa 1",
+    ]
+
+
 @cache
 def market(seed: int, messages: int, over_reduce_rate: float = 0.0) -> Market:
-    return generate_market(seed, messages, over_reduce_rate=over_reduce_rate)
+    """A generated market followed by the float trap."""
+    generated = generate_market(seed, messages, over_reduce_rate=over_reduce_rate)
+    return Market(lines=generated.lines + float_trap(generated), max_live=generated.max_live)
 
 
 @cache
@@ -36,9 +58,9 @@ def xfail(issue: str, why: str) -> pytest.MarkDecorator:
     return pytest.mark.xfail(strict=True, reason=f"{issue}: {why}")
 
 
-# Generated markets re-use ids across sides after removal (needs #7: dead orders) and sum
-# floats in a different order when the fill changes (needs #8: exact money). At target 1 no
-# sum is ever taken, so only #7 stands in the way.
+# Generated markets re-use ids across sides after removal (needs #7: dead orders) and end in
+# the float trap (needs #8: exact money). At target 1 no sum is ever taken, so only #7 stands
+# in the way.
 MARKET_MARKS = {
     1: xfail("#7", "removed orders stay in the book and shadow re-used ids"),
     200: xfail("#8 (needs #7)", "float totals print repeated lines"),

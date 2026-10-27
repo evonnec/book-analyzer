@@ -10,7 +10,7 @@ from collections.abc import Callable
 import pytest
 from system_cases import xfail
 from system_oracle import oracle
-from system_run import CliResult, run_in_process, run_subprocess
+from system_run import CliResult, mentions_line, run_in_process, run_subprocess
 
 
 def in_process(log: str, target: int) -> CliResult:
@@ -104,7 +104,7 @@ def test_reduce_after_removal_is_a_warning(runner: Runner) -> None:
     result = runner(log, 1)
     assert result.stdout == "1 B 1.00\n2 B NA\n4 B 2.00\n"
     assert len(result.warning_lines) == 1
-    assert "line 3" in result.warning_lines[0].lower()
+    assert mentions_line(result.warning_lines[0], 3)
 
 
 class TestExactMoney:
@@ -115,10 +115,18 @@ class TestExactMoney:
         assert result.stdout == "4 B 2.20\n"
         assert oracle(log, 4).stdout == "4 B 2.20\n"
 
+    @pytest.mark.parametrize(
+        ("size", "total"),
+        [
+            (10**12, "99999999999990000000000.00"),
+            # 31 significant digits: beyond Decimal's default context (28) as well
+            (123456789012345678, "12345678901233333232109876543.22"),
+        ],
+    )
     @xfail("#8", "float totals lose precision")
-    def test_large_total_is_exact(self, runner: Runner) -> None:
-        log = "1 A a S 99999999999.99 1000000000000\n"
-        assert runner(log, 1000000000000).stdout == "1 B 99999999999990000000000.00\n"
+    def test_large_total_is_exact(self, runner: Runner, size: int, total: str) -> None:
+        log = f"1 A a S 99999999999.99 {size}\n"
+        assert runner(log, size).stdout == f"1 B {total}\n"
 
     @xfail("#8", "a size beyond float range raises OverflowError")
     def test_huge_size_does_not_crash(self, runner: Runner) -> None:

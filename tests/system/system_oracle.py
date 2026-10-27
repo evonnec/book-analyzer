@@ -12,11 +12,15 @@ Policy implemented (the one the error-handling issue proposes):
   * a reduce >= the remaining size removes the order; ids can be re-used after removal;
   * a total "changes" when its printed (rounded half up to 2 places) value differs.
 Rejected messages produce one warning (their 1-based line number) and change nothing.
+
+Left to the implementation, so the tests stay clear of them: how many decimals a price may have
+(#8 asks for a fixed K >= 3 and rejects more; the tests use at most 3), whether other Unicode
+whitespace separates fields (`str.split()` does), and stripping versus rejecting a BOM.
 """
 
 import re
 from dataclasses import dataclass
-from decimal import ROUND_HALF_UP, Decimal, localcontext
+from decimal import MAX_PREC, ROUND_HALF_UP, Decimal, Inexact, localcontext
 
 BOM = chr(0xFEFF)  # a UTF-8 byte order mark, decoded
 DIGITS = re.compile(r"[0-9]+")
@@ -50,7 +54,7 @@ def _format(total: Decimal | None) -> str:
     if total is None:
         return "NA"
     with localcontext() as context:
-        context.prec = 200
+        context.traps[Inexact] = False  # rounding to cents is the one intended inexact step
         return format(total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), "f")
 
 
@@ -69,7 +73,18 @@ def _fill(orders: list[tuple[Decimal, int]], target: int, *, highest_first: bool
 
 
 def oracle(text: str, target: int) -> OracleResult:
-    """Run the specification over `text` for `target` shares."""
+    """Run the specification over `text` for `target` shares.
+
+    Decimal arithmetic runs with unbounded precision and `Inexact` trapped: the default
+    context (28 digits) would silently round a large total.
+    """
+    with localcontext() as context:
+        context.prec = MAX_PREC
+        context.traps[Inexact] = True
+        return _oracle(text, target)
+
+
+def _oracle(text: str, target: int) -> OracleResult:
     raw_lines = text.split("\n")
     if raw_lines and raw_lines[-1] == "":
         raw_lines.pop()

@@ -37,8 +37,9 @@ def generate_market(
     """Generate `messages` valid messages for a market with about `live_target` live orders.
 
     Prices follow a 2-decimal random walk. Roughly half of the messages are adds and half are
-    reduces. Most reduces remove the order exactly, some are partial and, when
-    `over_reduce_rate` > 0, some reduce by more than the remaining size (also a removal).
+    reduces, and about a fifth share the previous message's timestamp (bursts). Most reduces
+    remove the order exactly, some are partial and, when `over_reduce_rate` > 0, some reduce
+    by more than the remaining size (also a removal).
     Ids are re-used after removal, orders tie at the same price, and now and then the best
     order of a side is swept away or a very large order is added.
     """
@@ -74,7 +75,8 @@ def generate_market(
         return max(price, 1)
 
     for _ in range(messages):
-        timestamp += rng.randint(1, 500)
+        if rng.random() < 0.8:  # otherwise a burst: the same timestamp as the last message
+            timestamp += rng.randint(1, 500)
         mid = max(mid + rng.choice((-2, -1, 0, 0, 1, 2)), 50)
         add_probability = 0.56 if len(live) < live_target else 0.44
         if not live or rng.random() < add_probability:

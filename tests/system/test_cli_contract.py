@@ -4,6 +4,7 @@ All of these run the real program in a subprocess.
 """
 
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -80,29 +81,27 @@ class TestQuietShutdown:
     @pytest.mark.skipif(sys.platform == "win32", reason="POSIX pipe semantics")
     def test_closed_stdout_pipe_is_quiet(self) -> None:
         """Like `book-analyzer 1 < log | head -1` after the reader has gone away."""
-        process = subprocess.Popen(
-            [sys.executable, "-m", "book_analyzer", "1"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=child_env(),
-        )
-        assert process.stdin is not None
-        assert process.stdout is not None
-        assert process.stderr is not None
-        process.stdout.close()  # the consumer exited: every write now hits a closed pipe
+        read_end, write_end = os.pipe()
+        os.close(read_end)  # the consumer exited: every write to stdout hits a closed pipe
         try:
-            process.stdin.write(long_log(1500).encode())
-            process.stdin.close()
-        except BrokenPipeError:
-            pass  # the program may already have shut down
-        stderr = process.stderr.read().decode()
-        returncode = process.wait(timeout=60)
-        process.stderr.close()
+            # communicate() ignores a broken stdin pipe if the program stops reading early
+            completed = subprocess.run(
+                [sys.executable, "-m", "book_analyzer", "1"],
+                input=long_log(1500).encode(),
+                stdout=write_end,
+                stderr=subprocess.PIPE,
+                env=child_env(),
+                timeout=60,
+                check=False,
+            )
+        finally:
+            os.close(write_end)
+        stderr = completed.stderr.decode()
         assert "Traceback" not in stderr
         assert "BrokenPipeError" not in stderr
         assert stderr == ""
-        assert returncode == 141
+        # 141 = 128 + SIGPIPE, as #11 asks; dying of SIGPIPE looks the same to a shell.
+        assert completed.returncode in (141, -signal.SIGPIPE)
 
     @xfail("#11", "Ctrl-C prints a KeyboardInterrupt traceback")
     @pytest.mark.skipif(sys.platform == "win32", reason="POSIX signals")
@@ -120,7 +119,7 @@ class TestQuietShutdown:
         child = Child([], code=launcher)
         try:
             assert child.read_line(timeout=30) == "ready\n"
-            time.sleep(0.3)  # let the program reach its read loop
+            time.sleep(0.5)  # let the program reach its read loop (stdin stays open)
             child.process.send_signal(signal.SIGINT)
             returncode = child.process.wait(timeout=30)
             assert child.process.stderr is not None
@@ -129,7 +128,8 @@ class TestQuietShutdown:
             child.kill()
         assert "Traceback" not in stderr
         assert "KeyboardInterrupt" not in stderr
-        assert returncode == 130
+        # 130 = 128 + SIGINT, as #11 asks; dying of SIGINT looks the same to a shell.
+        assert returncode in (130, -signal.SIGINT)
 
 
 class TestRejectedMessageReporting:
@@ -140,7 +140,12 @@ class TestRejectedMessageReporting:
         result = run_subprocess(["1"], self.BAD_LOG)
         assert result.returncode == 0
         assert result.stdout == "1 B 1.00\n"
-        assert "rejected 2" in result.stderr.splitlines()[-1]
+        # #14 leaves the wording open ("for example `rejected 3 of N messages`"): require only
+        # a last stderr line that mentions rejection and the count.
+        summary = result.stderr.splitlines()[-1]
+        assert re.search(r"reject", summary, re.IGNORECASE)
+        assert re.search(r"\b2\b", summary)
+        assert len(result.warning_lines) == 2  # the summary itself names no line number
 
     def test_no_summary_on_clean_input(self) -> None:
         result = run_subprocess(["1"], ONE_ORDER)

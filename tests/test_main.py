@@ -3,7 +3,7 @@
 import os
 import subprocess
 import sys
-from io import StringIO
+from io import BytesIO, StringIO, TextIOWrapper
 from pathlib import Path
 
 import pytest
@@ -26,6 +26,11 @@ def run_module(*args: str, stdin: str = "") -> subprocess.CompletedProcess[str]:
     )
 
 
+def stdin_of(text: str) -> TextIOWrapper:
+    """A text stream like the real `sys.stdin` (so `reconfigure`, which #9 may call, works)."""
+    return TextIOWrapper(BytesIO(text.encode()), encoding="utf-8")
+
+
 class TestEntryInProcess:
     def test_explicit_argv(
         self,
@@ -34,7 +39,7 @@ class TestEntryInProcess:
         sample_expected: str,
     ) -> None:
         stdout = StringIO()
-        monkeypatch.setattr(sys, "stdin", StringIO(sample_input_clean))
+        monkeypatch.setattr(sys, "stdin", stdin_of(sample_input_clean))
         monkeypatch.setattr(sys, "stdout", stdout)
         entry(["200"])
         assert stdout.getvalue() == sample_expected
@@ -42,7 +47,7 @@ class TestEntryInProcess:
     def test_default_argv_is_sys_argv(self, monkeypatch: pytest.MonkeyPatch) -> None:
         stdout = StringIO()
         monkeypatch.setattr(sys, "argv", ["book-analyzer", "2"])
-        monkeypatch.setattr(sys, "stdin", StringIO("1 A a S 1.50 2\n"))
+        monkeypatch.setattr(sys, "stdin", stdin_of("1 A a S 1.50 2\n"))
         monkeypatch.setattr(sys, "stdout", stdout)
         entry()
         assert stdout.getvalue() == "1 B 3.00\n"

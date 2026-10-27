@@ -7,7 +7,7 @@ tests rely on.
 import re
 
 import pytest
-from system_cases import market
+from system_cases import expected, market
 from system_gen import BAD_LINE_CLASSES, Context, generate_market, inject_errors
 from system_oracle import oracle
 
@@ -49,11 +49,16 @@ class TestOracle:
             ("1 A a S 0.014 1\n", 1, "1 B 0.01\n"),
             # A total changes when its printed value changes: 1.001 -> 1.002 prints once.
             ("1 A a S 1.001 1\n2 A b S 1.002 1\n3 R a 1\n", 1, "1 B 1.00\n"),
-            # Exact arithmetic on huge numbers.
+            # Exact arithmetic on huge numbers, also beyond Decimal's default 28 digits.
             (
                 "1 A a S 99999999999.99 1000000000000\n",
                 1000000000000,
                 "1 B 99999999999990000000000.00\n",
+            ),
+            (
+                "1 A a S 99999999999.99 123456789012345678\n",
+                123456789012345678,
+                "1 B 12345678901233333232109876543.22\n",
             ),
             # An id may be re-used after removal, on either side.
             (
@@ -131,6 +136,43 @@ class TestGenerator:
                 partial += 1
                 sizes[fields[2]] -= int(fields[3])
         assert removing > 2 * partial > 0
+
+    def test_hard_cases_occur(self) -> None:
+        """Bursts at one timestamp, ids re-used on the other side, ties at the fill boundary."""
+        log = market(1, 3000)
+        timestamps = [line.split()[0] for line in log.lines]
+        assert len(set(timestamps)) < 0.9 * len(timestamps)
+        side_of: dict[str, str] = {}  # last side each id was added on
+        other_side = 0
+        for line in log.lines:
+            fields = line.split()
+            if fields[1] == "A":  # in a clean log an id is only re-added after its removal
+                other_side += side_of.get(fields[2], fields[3]) != fields[3]
+                side_of[fields[2]] = fields[3]
+        assert other_side > 100
+        # Both sides print at one timestamp (from different messages: one message moves one).
+        lines = expected(1, 3000, 1).lines
+        by_timestamp: dict[str, set[str]] = {}
+        for line in lines:
+            timestamp, side, _ = line.split()
+            by_timestamp.setdefault(timestamp, set()).add(side)
+        assert any(sides_ == {"B", "S"} for sides_ in by_timestamp.values())
+
+    def test_float_trap(self) -> None:
+        """The tail every cached market ends with: float sums differ, printed totals do not."""
+        tail = market(1, 3000).lines[-5:]
+        assert [line.split()[2] for line in tail] == ["trap0", "trap1", "trapa", "trapb", "trapa"]
+        for target in (200, 5000):
+            before = 0.1 + 0.7 + 0.7 + (target - 3) * 0.7
+            after = 0.1 + 0.7 + (target - 2) * 0.7
+            assert before != after
+            assert f"{before:.2f}" == f"{after:.2f}"
+            reduce_timestamp = tail[-1].split()[0]
+            assert not [
+                line
+                for line in expected(1, 3000, target).lines
+                if line.startswith(f"{reduce_timestamp} ")
+            ]
 
     def test_clean_logs_are_fully_accepted_by_the_oracle(self) -> None:
         assert oracle(market(3, 3000).text, 200).rejected == []

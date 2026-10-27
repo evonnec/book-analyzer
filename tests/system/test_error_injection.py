@@ -11,7 +11,7 @@ import pytest
 from system_cases import TARGETS, expected, market, scaled, xfail
 from system_gen import BAD_LINE_CLASSES, Context, Injected, inject_errors
 from system_oracle import oracle
-from system_run import CliResult, run_in_process, run_subprocess
+from system_run import CliResult, mentions_line, run_in_process, run_subprocess
 
 BOM = chr(0xFEFF)
 MESSAGES = scaled(3000)
@@ -29,7 +29,7 @@ def assert_one_warning_per_bad_line(result: CliResult, injected: Injected) -> No
     warnings = result.warning_lines
     assert len(warnings) == len(injected.bad_lines)
     for warning, number in zip(warnings, injected.bad_lines, strict=True):
-        assert f"line {number}" in warning.lower()
+        assert mentions_line(warning, number)
 
 
 @pytest.mark.parametrize(
@@ -81,7 +81,7 @@ class TestEachClassOfErrorIsSkipped:
         result = run_in_process(log, 2)
         assert result.stdout == reference.stdout
         assert len(result.warning_lines) == 1
-        assert "line 4" in result.warning_lines[0].lower()
+        assert mentions_line(result.warning_lines[0], 4)
 
     def test_subprocess(self, name: str) -> None:
         log = self.log(name)
@@ -90,7 +90,7 @@ class TestEachClassOfErrorIsSkipped:
         assert result.returncode == 0
         assert result.stdout == reference.stdout
         assert len(result.warning_lines) == 1
-        assert "line 4" in result.warning_lines[0].lower()
+        assert mentions_line(result.warning_lines[0], 4)
         assert "Traceback" not in result.stderr
 
 
@@ -113,5 +113,5 @@ def test_undecodable_bytes_are_a_warning_not_a_crash() -> None:
     assert result.returncode == 0
     assert result.stdout == "1 B 1.00\n3 B 0.50\n"
     assert len(result.warning_lines) == 1
-    assert "line 2" in result.warning_lines[0].lower()
+    assert mentions_line(result.warning_lines[0], 2)
     assert "Traceback" not in result.stderr

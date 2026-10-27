@@ -1,21 +1,25 @@
 """Ways to run the program under test: in a real subprocess, and in process via `cli.run`."""
 
 import contextlib
-import inspect
 import os
+import re
 import select
 import subprocess
 import sys
-from collections.abc import Callable, Mapping
-from contextlib import redirect_stderr
+from collections.abc import Mapping
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import cast
 
-from book_analyzer import cli
+from system_api import call_run
 
 SRC = str(Path(__file__).resolve().parents[2] / "src")
+LINE_NUMBER = re.compile(r"\bline [0-9]+\b", re.IGNORECASE)
+
+
+def mentions_line(warning: str, number: int) -> bool:
+    """Whether `warning` names line `number` (and not, say, line 40 for line 4)."""
+    return re.search(rf"\bline {number}\b", warning, re.IGNORECASE) is not None
 
 
 @dataclass(frozen=True)
@@ -26,7 +30,12 @@ class CliResult:
 
     @property
     def warning_lines(self) -> list[str]:
-        return [line for line in self.stderr.splitlines() if line.strip()]
+        """The stderr lines that name an input line number: the per-message warnings (#9).
+
+        A summary line without a line number (#14 proposes one at EOF) is not counted. A
+        traceback is (its frames name source lines), so a crash still breaks a warning count.
+        """
+        return [line for line in self.stderr.splitlines() if LINE_NUMBER.search(line)]
 
 
 def child_env(extra: Mapping[str, str] | None = None) -> dict[str, str]:
@@ -58,28 +67,9 @@ def run_subprocess(
 
 
 def run_in_process(text: str, target_size: int) -> CliResult:
-    """Run `book_analyzer.cli.run` on `text`.
-
-    The error stream is passed by keyword if `run` accepts one (its name contains "err" or
-    "warn"); otherwise `sys.stderr` is redirected, so the helper works before and after the
-    error-handling change.
-    """
+    """Run `book_analyzer.cli.run` on `text`, before or after #9 adds its error stream."""
     output, errors = StringIO(), StringIO()
-    kwargs: dict[str, object] = {
-        "input_file": StringIO(text),
-        "output_file": output,
-        "target_size": target_size,
-    }
-    error_parameter = next(
-        (name for name in inspect.signature(cli.run).parameters if "err" in name or "warn" in name),
-        None,
-    )
-    run = cast(Callable[..., None], cli.run)
-    if error_parameter is None:
-        with redirect_stderr(errors):
-            run(**kwargs)
-    else:
-        run(**kwargs, **{error_parameter: errors})
+    call_run(StringIO(text), output, errors, target_size)
     return CliResult(0, output.getvalue(), errors.getvalue())
 
 

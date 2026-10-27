@@ -3,16 +3,14 @@
 Set BOOK_ANALYZER_DATA to a directory holding `book_analyzer.in` and
 `book_analyzer.out.{1,200,10000}`. Set BOOK_ANALYZER_DATA_LINES=N to use only the first N input
 lines (extended to the end of that line's timestamp); the default is the whole file, which the
-current implementation needs hours to process.
+current implementation needs days to process (#7 brings it down to minutes).
 """
 
 import os
-from io import StringIO
 from pathlib import Path
 
 import pytest
-
-from book_analyzer.cli import run
+from system_run import run_in_process
 
 DATA_DIR = os.environ.get("BOOK_ANALYZER_DATA")
 LINE_LIMIT = os.environ.get("BOOK_ANALYZER_DATA_LINES")
@@ -64,6 +62,6 @@ def test_matches_reference_output(target_size: int) -> None:
         .splitlines(keepends=True)
         if last_timestamp is None or timestamp_of(line) <= last_timestamp
     ]
-    output = StringIO()
-    run(input_file=StringIO("".join(lines)), output_file=output, target_size=target_size)
-    assert output.getvalue().splitlines(keepends=True) == expected
+    result = run_in_process("".join(lines), target_size)
+    assert result.stdout.splitlines(keepends=True) == expected
+    assert result.stderr == ""  # the reference data has no erroneous messages
