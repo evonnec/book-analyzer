@@ -76,12 +76,19 @@ The code is split into a pure core and a thin I/O layer, under `src/book_analyze
   and wires up stdin and stdout.
 
 Data model: a `Book` keeps two dicts from order id to `Order`, one for bids and one for asks.
-Timestamps and ids are kept as strings; prices are floats and sizes are ints.
+Timestamps and ids are kept as strings and sizes as ints.
+
+Money is exact. A price is an ASCII decimal (`[0-9]+(\.[0-9]{1,6})?`, so up to six decimals; no
+sign, exponent, underscores or other digits) parsed straight into an integer number of
+millionths, never through a float. Totals are exact integers in the same unit, rounded half up to
+cents only when printed (`2.675` prints as `2.68`), so totals of any size stay exact.
 
 Totals: `get_expense` and `get_income` sort the relevant side by price (ascending for asks,
 descending for bids) and accumulate `size * price` until `TARGET_SIZE` shares are covered, taking
 only part of the last level if needed. `apply` computes both totals before and after the change
-and reports a side only if its total differs.
+and reports a side only if its printed (rounded) total differs. With prices of more than two
+decimals two exact totals can round to the same cents; no line is printed for such a change, so
+a side never prints the same value twice in a row.
 
 A reduce by at least an order's remaining size deletes the order, so the book holds only resting
 orders.
@@ -98,13 +105,9 @@ touches would remove the sorts (#10).
 
 Behavior is deliberately unchanged for now. The test suite pins each of these with a strict
 `xfail`, which fails once the defect is fixed so the marker has to be removed. Fixes are tracked
-in issues: #8 float money and rounding, #9 error handling,
+in issues: #9 error handling,
 #11 CLI argument handling, #12 streaming.
 
-- Totals are summed as floats and compared with `!=`, so a total that changes only by float noise
-  prints a duplicate line. (#8)
-- Totals are formatted with `f"{x:.2f}"`, which can round half-cent totals differently from exact
-  decimal half-up rounding (for example 0.015 prints as 0.01). (#8)
 - Warnings are written to stdout, not stderr. (#9)
 - A non-numeric size or price, or an unknown side, raises `ValueError` and aborts the run. (#9)
 - Reducing an unknown order id raises `KeyError`. (#9)
@@ -155,9 +158,9 @@ last line's timestamp so that no message is split from its timestamp, and compar
 reference lines up to that timestamp. The default is the whole file (1.19M messages), about a minute of
 CPU per target size.
 
-Current status: on the whole file, target sizes 1 and 10000 match exactly and 200 prints 411 extra
-lines, each repeating the previous line for its side, because of the float defect (#8). The test asserts exact equality and
-is not marked xfail, since it is opt-in.
+Current status: on the whole file, target sizes 1, 200 and 10000 all match byte for byte, with
+nothing written to stderr. The test asserts exact equality and is not marked xfail, since it is
+opt-in.
 
 ## Benchmark
 
