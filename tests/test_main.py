@@ -3,7 +3,7 @@
 import os
 import subprocess
 import sys
-from io import StringIO
+from io import BytesIO, StringIO, TextIOWrapper
 from pathlib import Path
 
 import pytest
@@ -26,6 +26,11 @@ def run_module(*args: str, stdin: str = "") -> subprocess.CompletedProcess[str]:
     )
 
 
+def stdin_of(text: str) -> TextIOWrapper:
+    """A text stream like the real `sys.stdin` (so `reconfigure`, which #9 may call, works)."""
+    return TextIOWrapper(BytesIO(text.encode()), encoding="utf-8")
+
+
 class TestEntryInProcess:
     def test_explicit_argv(
         self,
@@ -34,7 +39,7 @@ class TestEntryInProcess:
         sample_expected: str,
     ) -> None:
         stdout = StringIO()
-        monkeypatch.setattr(sys, "stdin", StringIO(sample_input_clean))
+        monkeypatch.setattr(sys, "stdin", stdin_of(sample_input_clean))
         monkeypatch.setattr(sys, "stdout", stdout)
         entry(["200"])
         assert stdout.getvalue() == sample_expected
@@ -42,7 +47,7 @@ class TestEntryInProcess:
     def test_default_argv_is_sys_argv(self, monkeypatch: pytest.MonkeyPatch) -> None:
         stdout = StringIO()
         monkeypatch.setattr(sys, "argv", ["book-analyzer", "2"])
-        monkeypatch.setattr(sys, "stdin", StringIO("1 A a S 1.50 2\n"))
+        monkeypatch.setattr(sys, "stdin", stdin_of("1 A a S 1.50 2\n"))
         monkeypatch.setattr(sys, "stdout", stdout)
         entry()
         assert stdout.getvalue() == "1 B 3.00\n"
@@ -63,7 +68,7 @@ class TestSubprocess:
         result = run_module("5", stdin="1 A a S 1.00 1\n")
         assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
 
-    @pytest.mark.xfail(strict=True, reason="warnings are written to stdout instead of stderr")
+    @pytest.mark.xfail(strict=True, reason="#9: warnings are written to stdout instead of stderr")
     def test_warning_is_on_stderr(self) -> None:
         result = run_module("1", stdin="1 A a S 1.00 1\nbad\n")
         assert result.returncode == 0
@@ -76,30 +81,33 @@ class TestSubprocess:
             pytest.param(
                 [],
                 marks=pytest.mark.xfail(
-                    strict=True, reason="missing TARGET_SIZE crashes with an IndexError traceback"
+                    strict=True,
+                    reason="#11: missing TARGET_SIZE crashes with an IndexError traceback",
                 ),
             ),
             pytest.param(
                 ["abc"],
                 marks=pytest.mark.xfail(
                     strict=True,
-                    reason="non-integer TARGET_SIZE crashes with a ValueError traceback",
+                    reason="#11: non-integer TARGET_SIZE crashes with a ValueError traceback",
                 ),
             ),
             pytest.param(
                 ["1.5"],
                 marks=pytest.mark.xfail(
                     strict=True,
-                    reason="non-integer TARGET_SIZE crashes with a ValueError traceback",
+                    reason="#11: non-integer TARGET_SIZE crashes with a ValueError traceback",
                 ),
             ),
             pytest.param(
                 ["0"],
-                marks=pytest.mark.xfail(strict=True, reason="zero TARGET_SIZE is accepted"),
+                marks=pytest.mark.xfail(strict=True, reason="#11: zero TARGET_SIZE is accepted"),
             ),
             pytest.param(
                 ["-5"],
-                marks=pytest.mark.xfail(strict=True, reason="negative TARGET_SIZE is accepted"),
+                marks=pytest.mark.xfail(
+                    strict=True, reason="#11: negative TARGET_SIZE is accepted"
+                ),
             ),
         ],
     )
