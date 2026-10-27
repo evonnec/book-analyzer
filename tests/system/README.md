@@ -52,7 +52,7 @@ keeps alive after a long replay (independent of how the book is built), and the 
 Every known defect is a strict xfail whose reason starts with the GitHub issue number, for
 example `#9: warnings are written to stdout`. A scenario that needs earlier fixes is tagged with
 the last one in the fix order (#7, #8, #9, #10/#11/#12, then #14) and says so:
-`#9 (needs #7, #8)`. When a fix lands, its xfails turn into XPASS(strict), which fails the run:
+`#9 (needs #8)`. When a fix lands, its xfails turn into XPASS(strict), which fails the run:
 delete the `xfail` marks tagged with that issue and the tests become regular tests.
 
     uv run pytest -rxX | grep '#7'      # what the dead-order fix should flip

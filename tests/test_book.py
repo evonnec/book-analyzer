@@ -5,7 +5,6 @@ and totals are compared exactly with `price(...)`, so the tests hold whether the
 floats (today) or exact integers (#8). Every amount here is exact in binary as well.
 """
 
-import pytest
 from system_api import price
 
 from book_analyzer import AddMessage, Book, ReduceMessage, Side, Update
@@ -148,14 +147,10 @@ class TestReduce:
         book.create_reduce_order(order_id="a", size=5)
         assert book.get_income() is None
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="#7: orders reduced to <= 0 stay in the book, so a negative size offsets others",
-    )
     def test_over_reduce_does_not_offset_other_orders(self) -> None:
         book = make_book(2, ("a", SELL, "1", 1), ("b", SELL, "2", 5))
         book.create_reduce_order(order_id="a", size=3)
-        # "a" is gone: 2 @ 2.00. Today a stays at size -2 and the total is 6.
+        # "a" is gone: 2 @ 2.00 (keeping it at size -2 would give 6.00).
         assert book.get_expense() == price("4")
 
 

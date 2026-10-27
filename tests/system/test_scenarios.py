@@ -30,8 +30,6 @@ def runner(request: pytest.FixtureRequest) -> Runner:
     return runner
 
 
-DEAD_ORDERS = xfail("#7", "a fully reduced order stays in the book")
-
 OVER_REDUCE_CASES = [
     # An over-reduce used to leave size -2: it offsets the next order instead of vanishing.
     pytest.param(
@@ -70,7 +68,6 @@ OVER_REDUCE_CASES = [
 
 @pytest.mark.parametrize(("log", "target", "expected"), OVER_REDUCE_CASES)
 class TestOverReduceAndReuse:
-    @DEAD_ORDERS
     def test_over_reduce_removes_the_order(
         self, runner: Runner, log: str, target: int, expected: str
     ) -> None:
@@ -98,7 +95,7 @@ def test_behaviour_that_already_works(runner: Runner, log: str, target: int, exp
     assert result.returncode == 0
 
 
-@xfail("#9 (needs #7)", "a reduce of a removed id crashes or corrupts the book")
+@xfail("#9", "a reduce of a removed id crashes or corrupts the book")
 def test_reduce_after_removal_is_a_warning(runner: Runner) -> None:
     log = "1 A a S 1.00 5\n2 R a 5\n3 R a 1\n4 A b S 2.00 2\n"
     result = runner(log, 1)

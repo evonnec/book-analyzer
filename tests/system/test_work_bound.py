@@ -93,12 +93,10 @@ def test_replay_runs(replay: Replay) -> None:
     assert 50 <= replay.max_live <= 200
 
 
-@xfail("#7", "fully reduced orders stay in the book, which grows with the log")
 def test_book_holds_only_live_orders(replay: Replay) -> None:
     assert replay.reachable_objects <= OBJECTS_PER_LIVE_ORDER * replay.max_live
 
 
-@xfail("#7", "fully reduced orders stay in the book, so every message sorts the whole history")
 def test_work_per_message_is_bounded_by_live_orders(replay: Replay) -> None:
     assert replay.sorted_elements <= WORK_FACTOR * MESSAGES * replay.max_live
 
