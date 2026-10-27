@@ -15,9 +15,7 @@ from system_run import CliResult, mentions_line, run_in_process, run_subprocess
 
 BOM = chr(0xFEFF)
 MESSAGES = scaled(3000)
-FULL_STACK = xfail(
-    "#9 (needs #8)", "generated errors need dead-order removal, exact sums, validation"
-)
+FULL_STACK = xfail("#9", "generated errors need dead-order removal, exact sums, validation")
 
 
 def injected_market(seed: int, target: int) -> Injected:

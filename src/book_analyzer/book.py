@@ -1,10 +1,15 @@
-"""Core order book logic: no I/O, no parsing."""
+"""Core order book logic: no I/O, no parsing.
+
+Money is exact: prices are integers in units of 10**-PRICE_DECIMALS (#8).
+"""
 
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Final
 
 __all__ = [
+    "PRICE_DECIMALS",
+    "PRICE_SCALE",
     "AddMessage",
     "Book",
     "Message",
@@ -13,10 +18,21 @@ __all__ = [
     "Side",
     "Total",
     "Update",
+    "cents",
 ]
 
-type Total = float | None
-"""A running total, or None when the book holds fewer shares than the target size."""
+PRICE_DECIMALS: Final = 6
+PRICE_SCALE: Final = 10**PRICE_DECIMALS
+_HALF_CENT: Final = PRICE_SCALE // 200
+_CENT: Final = PRICE_SCALE // 100
+
+type Total = int | None
+"""A running total in price units, or None when the book holds fewer shares than the target."""
+
+
+def cents(total: int) -> int:
+    """`total` (price units, >= 0) rounded half up to whole cents."""
+    return (total + _HALF_CENT) // _CENT
 
 
 class Side(StrEnum):
@@ -31,7 +47,7 @@ class Order:
     """A resting order."""
 
     order_id: str
-    price: float
+    price: int
     side: Side
     size: int
 
@@ -43,7 +59,7 @@ class AddMessage:
     timestamp: str
     order_id: str
     side: Side
-    price: float
+    price: int
     size: int
 
 
@@ -68,6 +84,11 @@ class Update:
     total: Total
 
 
+def _printed(total: Total) -> int | None:
+    """What a total prints as: the change rule compares this, not the exact total."""
+    return None if total is None else cents(total)
+
+
 class Book:
     """Running collection of unique orders, kept separately for bids and asks."""
 
@@ -86,7 +107,7 @@ class Book:
         return self._fill(self._buy_orders, descending=True)
 
     def _fill(self, orders: dict[str, Order], *, descending: bool) -> Total:
-        total: float = 0
+        total = 0
         available = 0
         remaining_size = self._target_size
 
@@ -108,7 +129,7 @@ class Book:
             return None
         return total
 
-    def create_add_order(self, order_id: str, price: float, side: Side, size: int) -> None:
+    def create_add_order(self, order_id: str, price: int, side: Side, size: int) -> None:
         """Add an order to the book."""
         new_order = Order(order_id=order_id, price=price, side=side, size=size)
         if side == Side.BUY:
@@ -125,7 +146,10 @@ class Book:
             del orders[order_id]
 
     def apply(self, message: Message) -> tuple[Update, ...]:
-        """Apply a message and return the totals it changed (buy first, then sell)."""
+        """Apply a message and return the totals it changed (buy first, then sell).
+
+        A total changes when its printed value (rounded half up to cents) changes.
+        """
         old_expense = self.get_expense()
         old_income = self.get_income()
 
@@ -137,9 +161,9 @@ class Book:
 
         updates: list[Update] = []
         new_expense = self.get_expense()
-        if new_expense != old_expense:
+        if _printed(new_expense) != _printed(old_expense):
             updates.append(Update(message.timestamp, Side.BUY, new_expense))
         new_income = self.get_income()
-        if new_income != old_income:
+        if _printed(new_income) != _printed(old_income):
             updates.append(Update(message.timestamp, Side.SELL, new_income))
         return tuple(updates)

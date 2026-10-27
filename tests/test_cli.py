@@ -14,7 +14,7 @@ from system_api import call_run, price, rejects, shown
 from system_run import CliResult, run_in_process
 
 from book_analyzer import AddMessage, ReduceMessage, Side, Update
-from book_analyzer.cli import format_update, parse_line
+from book_analyzer.cli import format_update, parse_line, parse_price
 
 
 def run_log(log: str, target_size: int = 200) -> CliResult:
@@ -264,11 +264,31 @@ class TestMalformedMessagesAreSkipped:
         assert "line 2" in warnings(result)[0]
 
 
-class TestKnownNumericDefects:
-    @pytest.mark.xfail(
-        strict=True,
-        reason="#8: totals are float sums compared with !=, so float noise prints a duplicate line",
+class TestParsePrice:
+    @pytest.mark.parametrize(
+        ("text", "units"),
+        [
+            ("44.26", 44_260_000),
+            ("1", 1_000_000),
+            ("0.5", 500_000),
+            ("2.675", 2_675_000),
+            ("0.000001", 1),
+            ("007.10", 7_100_000),
+        ],
     )
+    def test_exact_units(self, text: str, units: int) -> None:
+        assert parse_price(text) == units
+
+    @pytest.mark.parametrize(
+        "text",
+        ["1.0000001", "1e2", "+1", "-1.00", ".5", "5.", "1_0.00", "nan", "", "\u0661.\u0660\u0660"],
+    )
+    def test_rejects_anything_outside_the_grammar(self, text: str) -> None:
+        with pytest.raises(ValueError, match="invalid price"):
+            parse_price(text)
+
+
+class TestExactMoney:
     def test_reordered_sum_does_not_repeat_a_line(self) -> None:
         # Message 5 removes order "a" (the fill is still 0.10 + 0.70 + 0.70 + 0.70), but the
         # float sum is evaluated over different terms and differs in the last bit.
@@ -278,34 +298,10 @@ class TestKnownNumericDefects:
     @pytest.mark.parametrize(
         ("ask", "total"),
         [
-            pytest.param(
-                "0.015",
-                "0.02",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#8: float formatting rounds 0.015 down instead of half up"
-                ),
-            ),
-            pytest.param(
-                "0.125",
-                "0.13",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#8: float formatting rounds exact ties half to even"
-                ),
-            ),
-            pytest.param(
-                "1.005",
-                "1.01",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#8: float formatting rounds 1.005 down instead of half up"
-                ),
-            ),
-            pytest.param(
-                "2.675",
-                "2.68",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#8: float formatting rounds 2.675 down instead of half up"
-                ),
-            ),
+            ("0.015", "0.02"),
+            ("0.125", "0.13"),
+            ("1.005", "1.01"),
+            ("2.675", "2.68"),
             ("0.014", "0.01"),
             ("0.016", "0.02"),
         ],

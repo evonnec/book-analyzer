@@ -1,9 +1,7 @@
 """Property tests against a brute-force oracle written in integer cents.
 
-Prices are generated as whole cents and compared in integer cents (read back from how the
-total prints), which is safe from float noise and holds before and after #8 (integer money).
-The float defects are covered by the explicit xfail tests in test_cli.py; the stream property
-below tolerates their one visible symptom, repeated identical lines, and says so.
+Prices are generated as whole cents and compared in integer cents, read back from how the
+total prints. The stream property requires exact equality: no repeated lines.
 """
 
 from decimal import Decimal
@@ -158,14 +156,4 @@ def test_stream_output_matches_oracle(lines: list[str], target: int) -> None:
     result = run_in_process("".join(f"{line}\n" for line in lines), target)
     assert result.stderr == ""
 
-    # The float implementation may repeat a line when a sum changes only by noise (known
-    # defect, #8), so drop a line that repeats the previous line of the same side before
-    # comparing. #8 removes this tolerance.
-    actual: list[str] = []
-    previous: dict[str, str] = {}
-    for line in result.stdout.splitlines():
-        _, line_side, printed = line.split(" ")
-        if previous.get(line_side) != printed:
-            actual.append(line)
-        previous[line_side] = printed
-    assert actual == expected
+    assert result.stdout.splitlines() == expected

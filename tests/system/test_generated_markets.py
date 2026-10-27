@@ -4,7 +4,6 @@ Clean logs (no erroneous messages) at a shallow, a typical and a deep target. Ea
 process through `cli.run` and in a real subprocess. Expected failures, by what is missing:
 
   * target 1: dead orders shadow ids re-used after removal (#7);
-  * targets 200 and 5000: float totals print repeated lines (#8, once #7 is in).
 """
 
 import re

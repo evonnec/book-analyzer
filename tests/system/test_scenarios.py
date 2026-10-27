@@ -105,7 +105,6 @@ def test_reduce_after_removal_is_a_warning(runner: Runner) -> None:
 
 
 class TestExactMoney:
-    @xfail("#8", "float sums differ in the last bit and print a repeated line")
     def test_reordered_sum_does_not_repeat_a_line(self, runner: Runner) -> None:
         log = "1 A x0 S 0.10 1\n2 A x1 S 0.70 1\n3 A a S 0.70 1\n4 A b S 0.70 2\n5 R a 1\n"
         result = runner(log, 4)
@@ -120,19 +119,16 @@ class TestExactMoney:
             (123456789012345678, "12345678901233333232109876543.22"),
         ],
     )
-    @xfail("#8", "float totals lose precision")
     def test_large_total_is_exact(self, runner: Runner, size: int, total: str) -> None:
         log = f"1 A a S 99999999999.99 {size}\n"
         assert runner(log, size).stdout == f"1 B {total}\n"
 
-    @xfail("#8", "a size beyond float range raises OverflowError")
     def test_huge_size_does_not_crash(self, runner: Runner) -> None:
         log = f"1 A a S 1.00 {10**400}\n"
         result = runner(log, 10**401)
         assert result.stdout == ""
         assert result.returncode == 0
 
-    @xfail("#8", "totals that print the same are compared by their float values")
     def test_total_changing_only_below_a_cent_prints_nothing(self, runner: Runner) -> None:
         # 1.001 -> 1.002 both print as 1.00: the *printed* value did not change.
         log = "1 A a S 1.001 1\n2 A b S 1.002 1\n3 R a 1\n"
@@ -141,6 +137,5 @@ class TestExactMoney:
     @pytest.mark.parametrize(
         ("price", "total"), [("0.015", "0.02"), ("0.125", "0.13"), ("1.005", "1.01")]
     )
-    @xfail("#8", "totals are rounded as binary floats, not half up")
     def test_half_cents_round_up(self, runner: Runner, price: str, total: str) -> None:
         assert runner(f"9 A a S {price} 1\n", 1).stdout == f"9 B {total}\n"
