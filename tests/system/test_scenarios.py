@@ -8,7 +8,6 @@ the scenario is about money.
 from collections.abc import Callable
 
 import pytest
-from system_cases import xfail
 from system_oracle import oracle
 from system_run import CliResult, mentions_line, run_in_process, run_subprocess
 
@@ -95,7 +94,6 @@ def test_behaviour_that_already_works(runner: Runner, log: str, target: int, exp
     assert result.returncode == 0
 
 
-@xfail("#9", "a reduce of a removed id crashes or corrupts the book")
 def test_reduce_after_removal_is_a_warning(runner: Runner) -> None:
     log = "1 A a S 1.00 5\n2 R a 5\n3 R a 1\n4 A b S 2.00 2\n"
     result = runner(log, 1)

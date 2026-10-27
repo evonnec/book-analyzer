@@ -27,7 +27,7 @@ def without_warnings(output: str) -> str:
 
 
 def warnings(result: CliResult) -> list[str]:
-    """Warning lines from either stream (stdout before #9, stderr after)."""
+    """Warning lines from either stream, so a warning on the wrong stream is still counted."""
     return [line for line in (result.stdout + result.stderr).splitlines() if "arning" in line]
 
 
@@ -72,52 +72,14 @@ class TestParseLine:
     @pytest.mark.parametrize(
         "line",
         [
-            pytest.param(
-                "1 A a S cheap 1",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#9: non-numeric price raises ValueError"
-                ),
-            ),
-            pytest.param(
-                "1 A a S 1.00 many",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#9: non-numeric add size raises ValueError"
-                ),
-            ),
-            pytest.param(
-                "1 R a many",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#9: non-numeric reduce size raises ValueError"
-                ),
-            ),
-            pytest.param(
-                "1 A a X 1.00 1",
-                marks=pytest.mark.xfail(strict=True, reason="#9: unknown side raises ValueError"),
-            ),
-            pytest.param(
-                "1 A a 4",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#9: message type is ignored: 4 fields parse as a reduce"
-                ),
-            ),
-            pytest.param(
-                "1 X a 4",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#9: message type is ignored: 4 fields parse as a reduce"
-                ),
-            ),
-            pytest.param(
-                "1 R a S 1.00 1",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#9: message type is ignored: 6 fields parse as an add"
-                ),
-            ),
-            pytest.param(
-                "1 X a S 1.00 1",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#9: message type is ignored: 6 fields parse as an add"
-                ),
-            ),
+            "1 A a S cheap 1",
+            "1 A a S 1.00 many",
+            "1 R a many",
+            "1 A a X 1.00 1",
+            "1 A a 4",
+            "1 X a 4",
+            "1 R a S 1.00 1",
+            "1 X a S 1.00 1",
         ],
     )
     def test_malformed_content_is_invalid(self, line: str) -> None:
@@ -144,7 +106,6 @@ class TestFormatUpdate:
 
 
 class TestSpecificationSample:
-    @pytest.mark.xfail(strict=True, reason="#9: warnings are written to stdout instead of stderr")
     def test_sample(self, sample_input: str, sample_expected: str) -> None:
         # The sample starts with a blank line, which produces a warning on stdout.
         assert run_log(sample_input).stdout == sample_expected
@@ -186,7 +147,6 @@ class TestRun:
         assert len(warnings(result)) == 1
         assert "line 2" in warnings(result)[0]
 
-    @pytest.mark.xfail(strict=True, reason="#9: warnings are written to stdout instead of stderr")
     @pytest.mark.parametrize("bad_line", ["", "2 A a", "2 A a S 1.00 1 extra"])
     def test_warning_goes_to_stderr(self, bad_line: str) -> None:
         result = run_log(f"1 A a S 1.00 1\n{bad_line}\n", target_size=1)
@@ -209,52 +169,14 @@ class TestMalformedMessagesAreSkipped:
             "   ",
             "2 A a",
             "2 R a 1 1",
-            pytest.param(
-                "2 A q S cheap 1",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#9: non-numeric price raises ValueError"
-                ),
-            ),
-            pytest.param(
-                "2 A q S 1.00 many",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#9: non-numeric size raises ValueError"
-                ),
-            ),
-            pytest.param(
-                "2 R a many",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#9: non-numeric size raises ValueError"
-                ),
-            ),
-            pytest.param(
-                "2 A q X 1.00 1",
-                marks=pytest.mark.xfail(strict=True, reason="#9: unknown side raises ValueError"),
-            ),
-            pytest.param(
-                "2 R nope 1",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#9: reduce of unknown id raises KeyError"
-                ),
-            ),
-            pytest.param(
-                "2 A a S 5.00 5",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#9: duplicate add silently replaces the existing order"
-                ),
-            ),
-            pytest.param(
-                "2 X a 4",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#9: message type is ignored: 4 fields apply as a reduce"
-                ),
-            ),
-            pytest.param(
-                "2 R q S 0.50 1",
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#9: message type is ignored: 6 fields apply as an add"
-                ),
-            ),
+            "2 A q S cheap 1",
+            "2 A q S 1.00 many",
+            "2 R a many",
+            "2 A q X 1.00 1",
+            "2 R nope 1",
+            "2 A a S 5.00 5",
+            "2 X a 4",
+            "2 R q S 0.50 1",
         ],
     )
     def test_bad_line_is_skipped_and_processing_continues(self, bad_line: str) -> None:

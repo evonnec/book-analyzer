@@ -68,7 +68,6 @@ class TestSubprocess:
         result = run_module("5", stdin="1 A a S 1.00 1\n")
         assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
 
-    @pytest.mark.xfail(strict=True, reason="#9: warnings are written to stdout instead of stderr")
     def test_warning_is_on_stderr(self) -> None:
         result = run_module("1", stdin="1 A a S 1.00 1\nbad\n")
         assert result.returncode == 0
