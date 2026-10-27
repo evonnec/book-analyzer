@@ -25,8 +25,8 @@ After every message the program works out two totals:
 If a total differs from its previous value, a line `timestamp B total` (expense) or
 `timestamp S total` (income) is printed. Totals have two decimals. When that side of the book
 holds fewer than `TARGET_SIZE` shares the total is `NA`. Both totals start out as `NA`, so nothing
-is printed until a side first has enough liquidity. Malformed messages should produce a warning
-on stderr and be skipped (see Known issues for where that falls short today).
+is printed until a side first has enough liquidity. An erroneous message produces one warning
+on stderr and is skipped; processing continues and stdout carries only result lines.
 
 Example with `TARGET_SIZE` 200:
 
@@ -71,9 +71,30 @@ The code is split into a pure core and a thin I/O layer, under `src/book_analyze
 - `book.py` is the core and does no I/O or parsing. It defines `Side`, `Order`, the messages
   `AddMessage` and `ReduceMessage`, the result `Update`, and `Book`. `Book.apply(message)`
   mutates the book and returns the totals that changed, expense first, as a tuple of `Update`.
-- `cli.py` parses lines into messages (`parse_line`), formats updates (`format_update`) and
-  drives the loop (`run`) over any text streams. `__main__.py` reads the target size from argv
-  and wires up stdin and stdout.
+  It raises `MessageError` (a `ValueError`), before changing anything, for a reduce of an
+  unknown id or an add of an id that is still live.
+- `cli.py` parses lines into messages (`parse_line`, which raises `MessageError` for an invalid
+  line), formats updates (`format_update`) and drives the loop (`run`) over any text streams,
+  writing results to one stream and warnings to another. `__main__.py` reads the target size
+  from argv and wires up stdin, stdout and stderr.
+
+Input validation. Fields are separated by runs of spaces or tabs; a trailing CR is ignored and a
+UTF-8 BOM on the first line is dropped. A message is rejected when:
+
+- the type is not `A` with exactly six fields or `R` with exactly four;
+- the timestamp is not ASCII digits, the side is not `B` or `S`, the size is not a positive
+  ASCII integer, or the price is not a positive price in the grammar below;
+- a reduce names an id that is not live, or an add reuses an id that is still live.
+
+Accepted as valid: a reduce by at least the remaining size (it removes the order), reusing an id
+after its order was removed, a crossed book (bid at or above ask; orders are not matched), and
+non-increasing timestamps (the input is promised sorted, and rejecting would desynchronize the
+book). Undecodable bytes are decoded with `surrogateescape`, so they reject only their own line.
+Each rejected line gives exactly one warning on stderr, for example:
+
+```
+warning: line 3: unknown order id 'zz': '3 R zz 1'
+```
 
 Data model: a `Book` keeps two dicts from order id to `Order`, one for bids and one for asks.
 Timestamps and ids are kept as strings and sizes as ints.
@@ -103,16 +124,10 @@ touches would remove the sorts (#10).
 
 ## Known issues
 
-Behavior is deliberately unchanged for now. The test suite pins each of these with a strict
-`xfail`, which fails once the defect is fixed so the marker has to be removed. Fixes are tracked
-in issues: #9 error handling,
-#11 CLI argument handling, #12 streaming.
+The test suite pins each of these with a strict `xfail`, which fails once the defect is fixed so
+the marker has to be removed. Fixes are tracked in issues #11 (CLI argument handling) and #12
+(streaming).
 
-- Warnings are written to stdout, not stderr. (#9)
-- A non-numeric size or price, or an unknown side, raises `ValueError` and aborts the run. (#9)
-- Reducing an unknown order id raises `KeyError`. (#9)
-- Adding an id that already exists silently replaces the order. (#9)
-- The message type field (`A`/`R`) is ignored; messages are classified by field count. (#9)
 - A missing, non-integer, zero or negative `TARGET_SIZE` is not rejected with a usage error. (#11)
 - All of stdin is read before processing starts, so output is not produced incrementally. (#12)
 

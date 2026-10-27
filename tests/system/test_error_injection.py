@@ -1,21 +1,19 @@
 """Error-injected logs: bad lines warn on stderr, are skipped, and never change the output.
 
-A whole generated log with every class of erroneous message inserted at known positions needs
-the dead-order fix (#7), exact money (#8) and the validation (#9), so it is expected to fail
-until #9 lands. The per-class tests isolate each class on a tiny log.
+A whole generated log has every class of erroneous message inserted at known positions; the
+per-class tests isolate each class on a tiny log.
 """
 
 import sys
 
 import pytest
-from system_cases import TARGETS, expected, market, scaled, xfail
+from system_cases import TARGETS, expected, market, scaled
 from system_gen import BAD_LINE_CLASSES, Context, Injected, inject_errors
 from system_oracle import oracle
 from system_run import CliResult, mentions_line, run_in_process, run_subprocess
 
 BOM = chr(0xFEFF)
 MESSAGES = scaled(3000)
-FULL_STACK = xfail("#9", "generated errors need dead-order removal, exact sums, validation")
 
 
 def injected_market(seed: int, target: int) -> Injected:
@@ -31,7 +29,7 @@ def assert_one_warning_per_bad_line(result: CliResult, injected: Injected) -> No
 
 
 @pytest.mark.parametrize(
-    "target", [pytest.param(target, marks=FULL_STACK, id=f"target{target}") for target in TARGETS]
+    "target", [pytest.param(target, id=f"target{target}") for target in TARGETS]
 )
 class TestInjectedMarkets:
     def test_in_process(self, target: int) -> None:
@@ -59,7 +57,7 @@ FOLLOW_UP = "5 A z B 3.00 2"
 
 
 def class_param(name: str) -> object:
-    return pytest.param(name, marks=xfail("#9", f"'{name}' is not validated"), id=name)
+    return pytest.param(name, id=name)
 
 
 @pytest.mark.parametrize("name", [class_param(name) for name in BAD_LINE_CLASSES])
@@ -90,7 +88,6 @@ class TestEachClassOfErrorIsSkipped:
         assert "Traceback" not in result.stderr
 
 
-@xfail("#9", "a UTF-8 BOM is echoed into the first output timestamp")
 def test_bom_is_never_echoed() -> None:
     result = run_subprocess(["1"], b"\xef\xbb\xbf1 A a S 1.00 1\n2 A b S 0.50 1\n")
     assert result.returncode == 0
@@ -100,7 +97,6 @@ def test_bom_is_never_echoed() -> None:
     assert len(result.warning_lines) == (0 if result.stdout.startswith("1 ") else 1)
 
 
-@xfail("#9", "an undecodable byte aborts the run when UTF-8 mode is off")
 def test_undecodable_bytes_are_a_warning_not_a_crash() -> None:
     locale = "en_US.UTF-8" if sys.platform == "darwin" else "C.UTF-8"
     env = {"PYTHONUTF8": "0", "LC_ALL": locale}

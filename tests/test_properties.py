@@ -4,6 +4,7 @@ Prices are generated as whole cents and compared in integer cents, read back fro
 total prints. The stream property requires exact equality: no repeated lines.
 """
 
+import re
 from decimal import Decimal
 
 from hypothesis import given, settings
@@ -157,3 +158,25 @@ def test_stream_output_matches_oracle(lines: list[str], target: int) -> None:
     assert result.stderr == ""
 
     assert result.stdout.splitlines() == expected
+
+
+RESULT_LINE = re.compile(r"[0-9]+ [BS] ([0-9]+\.[0-9]{2}|NA)")
+WARNING_LINE = re.compile(r"warning: line ([0-9]+): .+")
+valid_lines = st.sampled_from(
+    ["1 A a S 1.00 5", "2 A b B 0.90 5", "3 R a 2", "4 R b 9", "5 A a S 1.10 1", "6 R zz 1"]
+)
+junk_lines = st.text(st.characters(exclude_characters="\n\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029"))
+
+
+@given(lines=st.lists(st.one_of(valid_lines, junk_lines), max_size=30), target=targets)
+def test_arbitrary_lines_never_crash(lines: list[str], target: int) -> None:
+    """Any input: no exception, well-formed results, one warning per rejected line (#9)."""
+    result = run_in_process("".join(f"{line}\n" for line in lines), target)
+    assert all(RESULT_LINE.fullmatch(line) for line in result.stdout.splitlines())
+    warned = []
+    for line in result.stderr.splitlines():
+        match = WARNING_LINE.fullmatch(line)
+        assert match is not None, line
+        warned.append(int(match.group(1)))
+    assert warned == sorted(set(warned))
+    assert all(1 <= number <= len(lines) for number in warned)

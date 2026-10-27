@@ -13,6 +13,7 @@ __all__ = [
     "AddMessage",
     "Book",
     "Message",
+    "MessageError",
     "Order",
     "ReduceMessage",
     "Side",
@@ -25,6 +26,11 @@ PRICE_DECIMALS: Final = 6
 PRICE_SCALE: Final = 10**PRICE_DECIMALS
 _HALF_CENT: Final = PRICE_SCALE // 200
 _CENT: Final = PRICE_SCALE // 100
+
+
+class MessageError(ValueError):
+    """An erroneous message (#9): it is reported and skipped, and changes nothing."""
+
 
 type Total = int | None
 """A running total in price units, or None when the book holds fewer shares than the target."""
@@ -148,8 +154,18 @@ class Book:
     def apply(self, message: Message) -> tuple[Update, ...]:
         """Apply a message and return the totals it changed (buy first, then sell).
 
+        Raises MessageError, before changing anything, for a reduce of an unknown id or an
+        add of an id that is live.
+
         A total changes when its printed value (rounded half up to cents) changes.
         """
+        match message:
+            case AddMessage(order_id=order_id):
+                if order_id in self._buy_orders or order_id in self._sell_orders:
+                    raise MessageError(f"order id {order_id!r} is already live")
+            case ReduceMessage(order_id=order_id):
+                if order_id not in self._buy_orders and order_id not in self._sell_orders:
+                    raise MessageError(f"unknown order id {order_id!r}")
         old_expense = self.get_expense()
         old_income = self.get_income()
 
