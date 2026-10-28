@@ -6,44 +6,124 @@ same number would earn.
 
 ## Problem
 
-The input is a log of order book messages on standard input, one per line, fields separated by a
-single space:
+### Background
 
-```
-timestamp A order-id side price size     add an order (side is B for bid, S for ask)
-timestamp R order-id size                reduce an order by size
-```
+A *limit order* is an offer to trade a number of shares at a stated price or better. A limit
+order to buy is a **bid**: the buyer will pay up to its price. A limit order to sell is an
+**ask**: the seller will accept at least its price. Orders that haven't traded yet rest in the
+**limit order book** ("the book"), and the bids and asks are its two sides.
 
-Order ids are unique. A reduce by at least the remaining size removes the order. The program
-takes one argument, `TARGET_SIZE`, a positive integer number of shares.
+Someone who wants to trade right away, at whatever the book offers, takes the best prices
+first. A buyer starts at the lowest ask and works up. A seller starts at the highest bid and works
+down. Each level supplies as many shares as it holds. For example, if the bids are 300 shares at
+$9.98, 200 at $10.00 and 100 at $10.01, selling 250 shares right away hits 100 @ 10.01 and 150 @
+10.00, for $2,501.00.
 
-After every message the program works out two totals:
+A market data feed describes the book as a stream of messages. Each message either adds an order
+or reduces the size of an existing one; reducing it to zero removes it. Replaying a recorded log
+of these messages rebuilds the book as it was at every moment.
 
-- the expense of buying `TARGET_SIZE` shares, filling from the lowest-priced asks upwards;
-- the income from selling `TARGET_SIZE` shares, filling from the highest-priced bids downwards.
+### Task
 
-If a total differs from its previous value, a line `timestamp B total` (expense) or
-`timestamp S total` (income) is printed. Totals have two decimals. When that side of the book
-holds fewer than `TARGET_SIZE` shares the total is `NA`. Both totals start out as `NA`, so nothing
-is printed until a side first has enough liquidity. An erroneous message produces one warning
-on stderr and is skipped; processing continues and stdout carries only result lines.
+`book-analyzer TARGET_SIZE` reads such a log on standard input. `TARGET_SIZE` is a positive
+integer number of shares. After each message it works out:
 
-Example with `TARGET_SIZE` 200:
+- the **expense** of buying `TARGET_SIZE` shares by taking asks, lowest price first;
+- the **income** from selling `TARGET_SIZE` shares by hitting bids, highest price first.
 
-```
-28800538 A b S 44.26 100     ask: 100 @ 44.26, not enough for 200
-28800562 A c B 44.10 100     bid: 100 @ 44.10, not enough for 200
-28800744 R b 100             ask removed
-28800758 A d B 44.18 157     bids 157 @ 44.18 + 100 @ 44.10: sells 200 for 8832.56
-```
+Whenever one of them changes, it prints the new value. Both start out as `NA` (not enough
+shares), so nothing is printed until a side first holds `TARGET_SIZE` shares.
 
-Only the last message changes a total, so the output is:
+### Input format
 
-```
-28800758 S 8832.56
-```
+One message per line, terminated by `\n`, fields separated by spaces. The log is sorted by
+timestamp.
 
-The full sample and its expected output live in `tests/conftest.py`.
+Add an order: `timestamp A order-id side price size`
+
+| Field | Meaning |
+|---|---|
+| `timestamp` | When the market generated the message, in milliseconds since midnight |
+| `A` | Literal: this message adds an order to the book |
+| `order-id` | Unique string that later reduce messages use to refer to this order |
+| `side` | `B` for a buy order (bid), `S` for a sell order (ask) |
+| `price` | The order's limit price |
+| `size` | The order's size in shares when it was sent to the market |
+
+Reduce an order: `timestamp R order-id size`
+
+| Field | Meaning |
+|---|---|
+| `timestamp` | When the market generated the message, in milliseconds since midnight |
+| `R` | Literal: this message reduces an order |
+| `order-id` | The order to reduce |
+| `size` | How many shares to remove from the order. This is not the new size. Reducing by the remaining size or more removes the order from the book |
+
+### Output format
+
+One line per changed total: `timestamp action total`
+
+| Field | Meaning |
+|---|---|
+| `timestamp` | The timestamp of the input message that caused the change |
+| `action` | `B` if the line carries the new expense to buy `TARGET_SIZE` shares, `S` if it carries the new income from selling them |
+| `total` | The expense (`B`) or income (`S`) with exactly two decimals, or `NA` if the relevant side (asks for `B`, bids for `S`) holds fewer than `TARGET_SIZE` shares |
+
+A single message changes only one side of the book, so it produces at most one line. An erroneous
+message produces one warning on standard error and is skipped. Processing continues, and standard
+output carries only result lines, so the tool works in a shell pipeline. The validation rules are
+under [Design](#design).
+
+### Worked example
+
+With `TARGET_SIZE` 200, the book shows bids on the left and asks on the right, best price first:
+
+| # | Message | Output | Book after (bids x asks) | Why |
+|---|---|---|---|---|
+| 1 | `28800538 A b S 44.26 100` | | — x 100@44.26 | Neither side holds 200 shares |
+| 2 | `28800562 A c B 44.10 100` | | 100@44.10 x 100@44.26 | Still not enough on either side |
+| 3 | `28800744 R b 100` | | 100@44.10 x — | `b` is removed. Both totals stay `NA`, so nothing changes |
+| 4 | `28800758 A d B 44.18 157` | `28800758 S 8832.56` | 157@44.18, 100@44.10 x — | Bids total 257. Selling 200: 157 × 44.18 + 43 × 44.10 = 6936.26 + 1896.30 |
+| 5 | `28800773 A e S 44.38 100` | | 157@44.18, 100@44.10 x 100@44.38 | Only 100 shares of asks, so the expense stays `NA` |
+| 6 | `28800796 R d 157` | `28800796 S NA` | 100@44.10 x 100@44.38 | Only 100 shares of bids are left |
+| 7 | `28800812 A f B 44.18 157` | `28800812 S 8832.56` | 157@44.18, 100@44.10 x 100@44.38 | Bids are back over 200 |
+| 8 | `28800974 A g S 44.27 100` | `28800974 B 8865.00` | 157@44.18, 100@44.10 x 100@44.27, 100@44.38 | Asks total exactly 200: 100 × 44.27 + 100 × 44.38 |
+| 9 | `28800975 R e 100` | `28800975 B NA` | 157@44.18, 100@44.10 x 100@44.27 | Asks drop below 200 |
+| 10 | `28812071 R f 100` | `28812071 S NA` | 57@44.18, 100@44.10 x 100@44.27 | `f` shrinks to 57, leaving 157 shares of bids |
+| 11 | `28813129 A h B 43.68 50` | `28813129 S 8806.50` | 57@44.18, 100@44.10, 50@43.68 x 100@44.27 | 57 × 44.18 + 100 × 44.10 + 43 × 43.68 |
+| 12 | `28813300 R f 57` | `28813300 S NA` | 100@44.10, 50@43.68 x 100@44.27 | `f` is removed, leaving 150 shares of bids |
+| 13 | `28813830 A i S 44.18 100` | `28813830 B 8845.00` | 100@44.10, 50@43.68 x 100@44.18, 100@44.27 | 100 × 44.18 + 100 × 44.27 |
+| 14 | `28814087 A j S 44.18 1000` | `28814087 B 8836.00` | 100@44.10, 50@43.68 x 1100@44.18, 100@44.27 | `i` and `j` tie at 44.18, so all 200 shares cost 44.18 |
+| 15 | `28814834 R c 100` | | 50@43.68 x 1100@44.18, 100@44.27 | Income was already `NA` and stays `NA` |
+| 16 | `28814864 A k B 44.09 100` | | 100@44.09, 50@43.68 x 1100@44.18, 100@44.27 | 150 shares of bids, still `NA` |
+| 17 | `28815774 R k 100` | | 50@43.68 x 1100@44.18, 100@44.27 | Back to 50 shares of bids |
+| 18 | `28815804 A l B 44.07 175` | `28815804 S 8804.25` | 175@44.07, 50@43.68 x 1100@44.18, 100@44.27 | 175 × 44.07 + 25 × 43.68 |
+| 19 | `28815937 R j 1000` | `28815937 B 8845.00` | 175@44.07, 50@43.68 x 100@44.18, 100@44.27 | With `j` gone, half the shares cost 44.27 again |
+| 20 | `28816245 A m S 44.22 100` | `28816245 B 8840.00` | 175@44.07, 50@43.68 x 100@44.18, 100@44.22, 100@44.27 | 44.22 beats 44.27: 100 × 44.18 + 100 × 44.22 |
+
+The output is just the Output column, in order. The same sample and its expected output are in
+`tests/conftest.py`.
+
+### Goals
+
+In priority order:
+
+- **Correctness.** It comes before everything else. The output must match the reference outputs
+  exactly.
+- **Clarity.** Another engineer should be able to understand, fix and extend the code without
+  extensive comments.
+- **Conciseness.** Less code means less to read and maintain.
+- **Efficiency.** The tool may run on live data, so time and memory matter. Gratuitous
+  inefficiency is a defect.
+- **Unix behavior.** It reads standard input and writes standard output, with no prompts mixed
+  into the results, so it composes with other tools.
+- **Standard library only.** It has no runtime dependencies.
+
+### Test data
+
+A larger log of real market data, 1.19M messages, comes with the reference implementation's
+outputs for target sizes 1, 200 and 10000. They aren't in the repository. See
+[Reference data test](#reference-data-test) for how to check against them.
 
 ## Install and run
 
@@ -114,13 +194,40 @@ a side never prints the same value twice in a row.
 A reduce by at least an order's remaining size deletes the order, so the book holds only resting
 orders.
 
-Complexity as currently implemented: each message calls `get_expense` and `get_income` twice
-(before and after the change), which is four full sorts of a side per message, so a message costs
-O(n log n) in the number of resting orders n and a log of m messages O(m n log n). Running time
-grows with book depth, not with the target size beyond the accumulation loop stopping early. On
-the 1.19M-message reference log (at most about 230 resting orders) a target size takes roughly a
-minute of CPU. Keeping each side ordered by price level and recomputing only the side a message
-touches would remove the sorts (#10).
+### Design questions
+
+**Why Python?** It keeps the code short and readable, and the standard library covers everything
+the tool needs. The cost is speed: on the 1.19M-message reference log a target size takes roughly
+a minute of CPU. That is fast enough for the provided data, which spans about 12 hours of market
+time.
+
+**How was the implementation chosen?** The first version stored each side as a dict from order id
+to order, and sorted a side whenever it needed a total. A version that kept a single ordered list
+of orders was tried and was slower on a sample of the reference log. `bisect` and `heapq` were
+considered but not tried at first. A heap is a poor fit because reduces remove orders from
+anywhere in the book, not only the best price. Later changes kept the design and fixed its
+defects:
+
+- fully reduced orders are deleted (#7);
+- money is exact integers (#8);
+- every message is validated (#9).
+
+A profile of the reference log points to the next step: a price-level book that keeps each side's
+levels sorted with `bisect` and recomputes only the side a message touches (#10). The profile shows
+about 200 live orders, at most 71 bid and 94 ask price levels, and 99.5% of reduces removing their
+order.
+
+**How does it scale with the target size?** Only through the accumulation loop, which walks levels
+from the best price until `TARGET_SIZE` shares are covered. On the reference log that loop visits
+about 1 level on average at target size 1, 1.3 at 200 and 37 at 10000. The sorts below cost the
+same at every target size, so they dominate.
+
+**How does it scale with the number of orders?** Each message calls `get_expense` and `get_income`
+twice, before and after the change. That is four full sorts of a side per message, so a message
+costs O(n log n) in the number of resting orders n, and a log of m messages costs O(m n log n).
+Memory is O(n), but the whole input is currently read before processing starts (#12). With a
+price-level book (#10) a message would cost O(log L) to find its level among L levels, plus the
+levels walked for the touched side.
 
 ## Known issues
 
