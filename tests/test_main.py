@@ -52,6 +52,45 @@ class TestEntryInProcess:
         entry()
         assert stdout.getvalue() == "1 B 3.00\n"
 
+    def test_positive_int_valid(self) -> None:
+        from book_analyzer.__main__ import positive_int
+
+        assert positive_int("1") == 1
+        assert positive_int("200") == 200
+
+    def test_positive_int_invalid(self) -> None:
+        import argparse
+
+        from book_analyzer.__main__ import positive_int
+
+        with pytest.raises(argparse.ArgumentTypeError):
+            positive_int("abc")
+        with pytest.raises(argparse.ArgumentTypeError):
+            positive_int("0")
+        with pytest.raises(argparse.ArgumentTypeError):
+            positive_int("-5")
+
+    def test_main_usage_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from book_analyzer.__main__ import main
+
+        monkeypatch.setattr(sys, "stderr", StringIO())
+        assert main(["abc"]) == 2
+
+    def test_main_keyboard_interrupt(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import book_analyzer.__main__ as main_mod
+
+        def raise_sigint(**kwargs: object) -> None:
+            raise KeyboardInterrupt()
+
+        monkeypatch.setattr(main_mod, "run", raise_sigint)
+        assert main_mod.main(["1"]) == 130
+
+    def test_entry_exits_on_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(sys, "stderr", StringIO())
+        with pytest.raises(SystemExit) as exc:
+            entry(["abc"])
+        assert exc.value.code == 2
+
 
 class TestSubprocess:
     def test_sample(self, sample_input_clean: str, sample_expected: str) -> None:
@@ -77,37 +116,13 @@ class TestSubprocess:
     @pytest.mark.parametrize(
         "args",
         [
-            pytest.param(
-                [],
-                marks=pytest.mark.xfail(
-                    strict=True,
-                    reason="#11: missing TARGET_SIZE crashes with an IndexError traceback",
-                ),
-            ),
-            pytest.param(
-                ["abc"],
-                marks=pytest.mark.xfail(
-                    strict=True,
-                    reason="#11: non-integer TARGET_SIZE crashes with a ValueError traceback",
-                ),
-            ),
-            pytest.param(
-                ["1.5"],
-                marks=pytest.mark.xfail(
-                    strict=True,
-                    reason="#11: non-integer TARGET_SIZE crashes with a ValueError traceback",
-                ),
-            ),
-            pytest.param(
-                ["0"],
-                marks=pytest.mark.xfail(strict=True, reason="#11: zero TARGET_SIZE is accepted"),
-            ),
-            pytest.param(
-                ["-5"],
-                marks=pytest.mark.xfail(
-                    strict=True, reason="#11: negative TARGET_SIZE is accepted"
-                ),
-            ),
+            [],
+            ["abc"],
+            ["1.5"],
+            ["0"],
+            ["-5"],
+            ["+5"],
+            ["5_0"],
         ],
     )
     def test_invalid_target_size_is_a_usage_error(self, args: list[str]) -> None:

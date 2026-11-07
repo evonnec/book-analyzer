@@ -229,13 +229,19 @@ Memory is O(n), but the whole input is currently read before processing starts (
 price-level book (#10) a message would cost O(log L) to find its level among L levels, plus the
 levels walked for the touched side.
 
+### Exit status
+
+- `0`: Success (all input processed).
+- `2`: Command line usage error (missing or invalid `TARGET_SIZE`).
+- `130`: Terminated by SIGINT (Ctrl-C).
+- `141`: Terminated by SIGPIPE (stdout pipe closed by reader).
+
 ## Known issues
 
 The test suite pins each of these with a strict `xfail`, which fails once the defect is fixed so
 the marker has to be removed. Fixes are tracked in issues #11 (CLI argument handling) and #12
 (streaming).
 
-- A missing, non-integer, zero or negative `TARGET_SIZE` is not rejected with a usage error. (#11)
 - All of stdin is read before processing starts, so output is not produced incrementally. (#12)
 
 ## Development

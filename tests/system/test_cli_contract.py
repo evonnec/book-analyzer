@@ -22,7 +22,7 @@ ONE_ORDER = "1 A a S 1.00 5\n"
 
 
 def usage_error(args: list[str], why: str) -> object:
-    return pytest.param(args, marks=xfail("#11", why), id="-".join(args) or "no-args")
+    return pytest.param(args, id="-".join(args) or "no-args")
 
 
 class TestArgumentMatrix:
@@ -55,7 +55,6 @@ class TestArgumentMatrix:
         result = run_subprocess(args, ONE_ORDER)
         assert (result.returncode, result.stdout, result.stderr) == (0, stdout, "")
 
-    @xfail("#11", "there is no --help")
     def test_help_exits_zero_with_usage_on_stdout(self) -> None:
         result = run_subprocess(["--help"])
         assert result.returncode == 0
@@ -77,7 +76,6 @@ def long_log(pairs: int) -> str:
 
 
 class TestQuietShutdown:
-    @xfail("#11", "a closed stdout pipe gives a BrokenPipeError traceback and exit status 120")
     @pytest.mark.skipif(sys.platform == "win32", reason="POSIX pipe semantics")
     def test_closed_stdout_pipe_is_quiet(self) -> None:
         """Like `book-analyzer 1 < log | head -1` after the reader has gone away."""
@@ -101,9 +99,9 @@ class TestQuietShutdown:
         assert "BrokenPipeError" not in stderr
         assert stderr == ""
         # 141 = 128 + SIGPIPE, as #11 asks; dying of SIGPIPE looks the same to a shell.
-        assert completed.returncode in (141, -signal.SIGPIPE)
+        sigpipe = getattr(signal, "SIGPIPE", 13)
+        assert completed.returncode in (141, -sigpipe)
 
-    @xfail("#11", "Ctrl-C prints a KeyboardInterrupt traceback")
     @pytest.mark.skipif(sys.platform == "win32", reason="POSIX signals")
     def test_sigint_is_quiet(self) -> None:
         # A launcher imports the package first and announces readiness, so the signal cannot
